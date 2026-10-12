@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkillBridge — CodeStorm 2026</title>
+<meta name="description" content="SkillBridge: deterministic, client-side resume intelligence. CodeStorm 2026 presentation deck.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body { background:#000; color:#fff; overflow:hidden; font-family:'Space Grotesk', -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing:antialiased; }
+  #stars { position:fixed; inset:0; z-index:0; }
+  .vignette { position:fixed; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.75) 100%); }
+  .progress { position:fixed; top:0; left:0; height:2px; width:0%; background:#fff; z-index:50; box-shadow:0 0 12px rgba(255,255,255,.7); transition:width .6s cubic-bezier(.16,1,.3,1); }
+  .counter { position:fixed; bottom:28px; right:36px; z-index:50; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.2em; color:rgba(255,255,255,.45); }
+  .brand { position:fixed; top:26px; left:36px; z-index:50; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.28em; color:rgba(255,255,255,.55); display:flex; align-items:center; gap:10px; }
+  .brand .dot { width:7px; height:7px; border-radius:50%; background:#fff; box-shadow:0 0 10px rgba(255,255,255,.9); animation:pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1; transform:scale(1);} 50%{opacity:.4; transform:scale(.7);} }
+  .deck { position:fixed; inset:0; z-index:10; }
+  .slide { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; padding:0 9vw; opacity:0; transform:translateY(46px) scale(.985); transition:opacity .65s ease, transform .8s cubic-bezier(.16,1,.3,1); pointer-events:none; }
+  .slide.active { opacity:1; transform:none; pointer-events:auto; }
+  .slide.center { text-align:center; align-items:center; }
+  .kicker { font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.32em; color:rgba(255,255,255,.5); text-transform:uppercase; margin-bottom:26px; display:inline-flex; align-items:center; gap:10px; }
+  .kicker::before { content:''; width:26px; height:1px; background:rgba(255,255,255,.4); display:inline-block; }
+  .slide.center .kicker::after { content:''; width:26px; height:1px; background:rgba(255,255,255,.4); display:inline-block; }
+  h1.display { font-size:clamp(40px, 6.6vw, 100px); font-weight:700; letter-spacing:-.02em; line-height:1.04; text-shadow:0 0 45px rgba(255,255,255,.28); max-width:15ch; }
+  h1.display .dim { color:rgba(255,255,255,.42); text-shadow:none; }
+  .slide.center h1.display { max-width:none; }
+  h1.mega { font-size:clamp(64px, 12vw, 180px); font-weight:700; letter-spacing:.06em; line-height:1; text-shadow:0 0 60px rgba(255,255,255,.35); }
+  .deck-logo { width:230px; height:103px; object-fit:cover; object-position:center; margin-bottom:10px; }
+  .lead { margin-top:28px; font-size:clamp(16px, 1.9vw, 24px); color:rgba(255,255,255,.72); line-height:1.65; max-width:56ch; font-weight:400; }
+  .slide.center .lead { margin-left:auto; margin-right:auto; }
+  .lead strong { color:#fff; font-weight:600; }
+  .mono { font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:clamp(13px, 1.4vw, 17px); color:rgba(255,255,255,.6); margin-top:22px; letter-spacing:.04em; line-height:1.9; }
+  .mono .ok { color:#fff; }
+  .rv { opacity:0; transform:translateY(30px); transition:opacity .7s ease, transform .8s cubic-bezier(.16,1,.3,1); transition-delay:var(--d, 0s); }
+  .slide.active .rv { opacity:1; transform:none; }
+  .title-sub { margin-top:26px; font-size:clamp(20px, 3vw, 38px); font-weight:500; color:rgba(255,255,255,.85); letter-spacing:-.01em; }
+  .title-meta { margin-top:44px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:13px; letter-spacing:.22em; color:rgba(255,255,255,.45); text-transform:uppercase; line-height:2.1; }
+  .hint { position:absolute; bottom:34px; left:50%; transform:translateX(-50%); font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.3em; color:rgba(255,255,255,.4); animation:hintFloat 2.2s ease-in-out infinite; text-transform:uppercase; white-space:nowrap; }
+  @keyframes hintFloat { 0%,100%{opacity:.35;} 50%{opacity:.9;} }
+  .steps { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:18px; margin-top:44px; max-width:1150px; }
+  .step { border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:26px 22px; background:rgba(255,255,255,.025); backdrop-filter:blur(6px); }
+  .step .n { font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.25em; color:rgba(255,255,255,.45); margin-bottom:12px; }
+  .step .t { font-size:19px; font-weight:600; margin-bottom:10px; }
+  .step .d { font-size:14px; color:rgba(255,255,255,.6); line-height:1.6; }
+  .step .d code { font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12.5px; color:#fff; background:rgba(255,255,255,.08); padding:1px 6px; border-radius:4px; }
+  .step .d strong { color:#fff; }
+  .formula { margin-top:40px; border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:38px 44px; background:rgba(255,255,255,.03); backdrop-filter:blur(8px); display:inline-block; text-align:center; }
+  .formula .eq { font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:clamp(20px, 3vw, 38px); font-weight:600; letter-spacing:.02em; text-shadow:0 0 30px rgba(255,255,255,.3); }
+  .formula .eq .frac { display:inline-flex; flex-direction:column; vertical-align:middle; margin:0 6px; }
+  .formula .eq .frac span:first-child { border-bottom:2px solid #fff; padding-bottom:6px; }
+  .formula .eq .frac span:last-child { padding-top:6px; color:rgba(255,255,255,.65); }
+  .formula .note { margin-top:18px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:13px; color:rgba(255,255,255,.5); letter-spacing:.06em; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:18px; margin-top:44px; max-width:1050px; }
+  .stat { border-top:1px solid rgba(255,255,255,.2); padding-top:20px; }
+  .stat .v { font-size:clamp(32px, 4.2vw, 58px); font-weight:700; letter-spacing:-.02em; text-shadow:0 0 30px rgba(255,255,255,.25); }
+  .stat .l { margin-top:8px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.18em; color:rgba(255,255,255,.5); text-transform:uppercase; line-height:1.7; }
+  .bigbtn { display:inline-flex; align-items:center; gap:16px; margin-top:44px; padding:22px 54px; background:#fff; color:#000; border-radius:999px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:16px; font-weight:600; letter-spacing:.12em; text-decoration:none; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease; box-shadow:0 0 0 rgba(255,255,255,0); }
+  .bigbtn:hover { transform:scale(1.05); box-shadow:0 0 44px rgba(255,255,255,.35); }
+  .bigbtn .arr { font-size:20px; }
+  .qa { margin-top:50px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:13px; letter-spacing:.3em; color:rgba(255,255,255,.5); text-transform:uppercase; }
+  .livepill { display:inline-block; margin-top:26px; font-family:'IBM Plex Mono', ui-monospace, monospace; font-size:12px; letter-spacing:.22em; color:#00FF88; border:1px solid rgba(0,255,136,.4); background:rgba(0,255,136,.07); padding:10px 22px; border-radius:999px; text-transform:uppercase; }
+  @media (max-width:700px) { .slide { padding:0 7vw; } .formula { padding:26px 20px; } .counter { right:20px; bottom:20px; } .brand { left:20px; top:18px; } .deck-logo { height:80px; } }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="vignette"></div>
+<div class="progress" id="progress"></div>
+<div class="brand"><span class="dot"></span>SKILLBRIDGE</div>
+<div class="counter" id="counter">01 / 16</div>
+<div class="deck" id="deck">
+
+  <section class="slide center">
+    <div class="kicker rv" style="--d:.15s">CodeStorm 2026 · MSOT</div>
+    <img class="deck-logo rv" style="--d:.25s" src="skillbridge-logo.png" alt="SkillBridge logo">
+    <h1 class="mega rv" style="--d:.35s">SKILLBRIDGE</h1>
+    <div class="title-sub rv" style="--d:.55s">Your resume already knows.<br>We just read it properly.</div>
+    <div class="title-meta rv" style="--d:.8s">Deterministic resume intelligence · 100% client-side · live web feed<br>by Shivansh Singh</div>
+    <div class="hint rv" style="--d:1.1s">press → to begin</div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">01 // The Problem</div>
+    <h1 class="display rv" style="--d:.25s">Every resume enters<br>a <span class="dim">black box.</span></h1>
+    <p class="lead rv" style="--d:.5s">You upload your resume. <strong>An algorithm judges it.</strong><br>You never learn <strong>why</strong> you were rejected.</p>
+    <p class="mono rv" style="--d:.7s"><span class="ok">→</span> Students optimize blindly. &nbsp;<span class="ok">→</span> Recruiters drown in noise.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">02 // The Cost</div>
+    <h1 class="display rv" style="--d:.25s">Opacity has<br>a <span class="dim">price.</span></h1>
+    <p class="lead rv" style="--d:.5s">Qualified candidates get filtered out by <strong>keyword games</strong>.<br>Great people never get seen. <strong>No decision can be explained.</strong></p>
+    <p class="mono rv" style="--d:.7s">the signal is in the resume. <span class="ok">the readers are broken.</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">03 // The Twist</div>
+    <h1 class="display rv" style="--d:.25s">An &ldquo;AI product&rdquo;<br>with <span class="dim">zero AI.</span></h1>
+    <p class="lead rv" style="--d:.5s"><strong>No API calls. No black box. No hallucination.</strong><br>Just math — deterministic, transparent, instant.</p>
+    <p class="mono rv" style="--d:.7s">same resume in <span class="ok">→</span> same score out. <span class="ok">every single time.</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">04 // The Pipeline</div>
+    <h1 class="display rv" style="--d:.25s">Resume in.<br><span class="dim">Roadmap out.</span></h1>
+    <div class="steps">
+      <div class="step rv" style="--d:.45s"><div class="n">STAGE 01</div><div class="t">Ingest</div><div class="d">PDF, DOCX, TXT parsed <strong>inside your browser</strong>. Your resume never leaves the device.</div></div>
+      <div class="step rv" style="--d:.55s"><div class="n">STAGE 02</div><div class="t">Tokenize</div><div class="d">N-gram windows catch <code>machine learning</code>, <code>spring boot</code> — not just single words.</div></div>
+      <div class="step rv" style="--d:.65s"><div class="n">STAGE 03</div><div class="t">Resolve</div><div class="d"><strong>39 skills · 98 aliases.</strong> <code>JS</code>→JavaScript, <code>K8s</code>→Kubernetes. No vocabulary penalty.</div></div>
+      <div class="step rv" style="--d:.75s"><div class="n">STAGE 04</div><div class="t">Sync</div><div class="d"><strong>Live web feed</strong> pulls real openings — Utah corridor included. Curated registry as fallback.</div></div>
+      <div class="step rv" style="--d:.85s"><div class="n">STAGE 05</div><div class="t">Score</div><div class="d">Weighted fit against <strong>live + 44 curated roles</strong> across 8 corridors. Ranked. Explained.</div></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">05 // Ingest</div>
+    <h1 class="display rv" style="--d:.25s">Your resume never<br><span class="dim">leaves the room.</span></h1>
+    <p class="lead rv" style="--d:.5s">PDF parsed with <strong>pdf.js</strong>. DOCX with <strong>mammoth</strong>. TXT natively.<br>All <strong>inside your browser tab</strong> — zero uploads, zero servers.</p>
+    <p class="mono rv" style="--d:.7s">the most private resume parser <span class="ok">is the one with no backend.</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">06 // Understand</div>
+    <h1 class="display rv" style="--d:.25s">It reads like<br>a <span class="dim">recruiter should.</span></h1>
+    <div class="steps">
+      <div class="step rv" style="--d:.45s"><div class="n">N-GRAMS</div><div class="t">Compound terms</div><div class="d"><code>machine learning</code> and <code>spring boot</code> survive as single concepts — never shredded into noise.</div></div>
+      <div class="step rv" style="--d:.58s"><div class="n">TAXONOMY</div><div class="t">39 skills · 98 aliases</div><div class="d"><code>JS</code>, <code>TS</code>, <code>K8s</code>, <code>tf</code> — every shorthand resolves to its <strong>canonical skill</strong>.</div></div>
+      <div class="step rv" style="--d:.71s"><div class="n">FAIRNESS</div><div class="t">No vocabulary penalty</div><div class="d">Wrote <code>React.js</code> instead of <code>React</code>? <strong>Same skill. Same score.</strong></div></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">07 // The Math</div>
+    <h1 class="display rv" style="--d:.25s">Keyword counting<br><span class="dim">is lying to you.</span></h1>
+    <div class="formula rv" style="--d:.5s">
+      <div class="eq">fit&nbsp;=&nbsp;<span class="frac"><span>&Sigma; w &middot; matched</span><span>&Sigma; w &middot; required</span></span>&nbsp;&times;&nbsp;100</div>
+      <div class="note">w &isin; [1..5] — employer priority weights per role</div>
+    </div>
+    <p class="mono rv" style="--d:.7s">DSA weight <span class="ok">5</span>. &nbsp;Git weight <span class="ok">2</span>. &nbsp;Core skills gate the role — trivia can't inflate it.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">08 // Live Mode</div>
+    <h1 class="display rv" style="--d:.25s">The web is<br>the <span class="dim">database.</span></h1>
+    <p class="lead rv" style="--d:.5s">On load, the site pulls <strong>real openings</strong> from a live job feed —<br>straight into the same deterministic engine.</p>
+    <div class="rv" style="--d:.65s"><span class="livepill">● Live · Utah corridor · refresh on demand</span></div>
+    <p class="mono rv" style="--d:.8s">live rows wear a <span class="ok">● LIVE</span> badge. &nbsp;offline? <span class="ok">curated registry holds the line.</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">09 // Outputs</div>
+    <h1 class="display rv" style="--d:.25s">Not a score.<br><span class="dim">A battle plan.</span></h1>
+    <div class="steps">
+      <div class="step rv" style="--d:.45s"><div class="n">READINESS</div><div class="t">Market score</div><div class="d">One number: <strong>how hirable you look</strong> across every corridor right now.</div></div>
+      <div class="step rv" style="--d:.58s"><div class="n">RANKED</div><div class="t">Vacancies</div><div class="d">Every role scored &amp; ordered — with <strong>matched vs missing</strong> skills spelled out.</div></div>
+      <div class="step rv" style="--d:.71s"><div class="n">ROADMAP</div><div class="t">Skill gaps</div><div class="d">Missing skills ranked by <strong>demand</strong>. Learn this first, win fastest.</div></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">10 // The Proof</div>
+    <h1 class="display rv" style="--d:.25s">Numbers,<br><span class="dim">not promises.</span></h1>
+    <div class="stats">
+      <div class="stat rv" style="--d:.45s"><div class="v">44+</div><div class="l">curated roles + live web feed · 8 corridors</div></div>
+      <div class="stat rv" style="--d:.55s"><div class="v">&lt;15<span style="font-size:.5em">ms</span></div><div class="l">end-to-end scoring</div></div>
+      <div class="stat rv" style="--d:.65s"><div class="v">100%</div><div class="l">client-side resume parsing · zero uploads</div></div>
+      <div class="stat rv" style="--d:.75s"><div class="v">0</div><div class="l">hallucinations · black boxes · servers</div></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">11 // Privacy</div>
+    <h1 class="display rv" style="--d:.25s">Your data<br><span class="dim">never travels.</span></h1>
+    <p class="lead rv" style="--d:.5s">Parsing, tokenizing, scoring — <strong>everything runs in your tab</strong>.<br>The only network call fetches <strong>public job listings</strong>. Your resume stays yours.</p>
+    <p class="mono rv" style="--d:.7s">privacy isn't a policy page. <span class="ok">it's an architecture.</span></p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">12 // Built With</div>
+    <h1 class="display rv" style="--d:.25s">One file.<br><span class="dim">Zero excuses.</span></h1>
+    <div class="steps">
+      <div class="step rv" style="--d:.45s"><div class="n">STACK</div><div class="t">React 18 · TypeScript</div><div class="d">Vite + Tailwind build, shipped as a <strong>single self-contained HTML file</strong>.</div></div>
+      <div class="step rv" style="--d:.58s"><div class="n">PARSING</div><div class="t">pdf.js · mammoth</div><div class="d">Real binary parsing of PDF &amp; DOCX — <strong>in the browser</strong>, via CDN.</div></div>
+      <div class="step rv" style="--d:.71s"><div class="n">COSMOS</div><div class="t">Custom canvas engine</div><div class="d">Dependency-free <strong>starfield</strong> with parallax drift — the living background.</div></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker rv" style="--d:.1s">13 // Why It Wins</div>
+    <h1 class="display rv" style="--d:.25s">Deterministic<br>beats <span class="dim">black-box.</span></h1>
+    <div class="steps">
+      <div class="step rv" style="--d:.45s"><div class="n">EXPLAINABLE</div><div class="t">Every point accounted</div><div class="d">The formula is on the slide. <strong>Audit any score</strong> by hand.</div></div>
+      <div class="step rv" style="--d:.58s"><div class="n">REPEATABLE</div><div class="t">Same input, same output</div><div class="d">No temperature. No drift. <strong>No vibes.</strong></div></div>
+      <div class="step rv" style="--d:.71s"><div class="n">PRIVATE</div><div class="t">Zero data exhaust</div><div class="d">Nothing to leak, nothing to sell, <strong>nothing to breach</strong>.</div></div>
+    </div>
+  </section>
+
+  <section class="slide center">
+    <div class="kicker rv" style="--d:.1s">14 // Live Demo</div>
+    <h1 class="display rv" style="--d:.25s">Don't take<br>my word for it.</h1>
+    <div class="rv" style="--d:.5s">
+      <a class="bigbtn" href="index.html" target="_blank" rel="noopener">OPEN THE SITE <span class="arr">&rarr;</span></a>
+    </div>
+    <p class="mono rv" style="--d:.7s">upload a resume. <span class="ok">watch it think.</span></p>
+  </section>
+
+  <section class="slide center">
+    <div class="kicker rv" style="--d:.1s">15 // The Point</div>
+    <h1 class="display rv" style="--d:.25s">Built for the students<br>the <span class="dim">black box ignores.</span></h1>
+    <p class="lead rv" style="--d:.5s"><strong>Transparent. Private. Instant. Live.</strong><br>The resume was never the problem — the reading was.</p>
+    <div class="qa rv" style="--d:.75s">SkillBridge · CodeStorm 2026 · Thank you</div>
+  </section>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var progress = document.getElementById('progress');
+  var counter = document.getElementById('counter');
+  var idx = 0;
+  var N = slides.length;
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function show(i) {
+    idx = Math.max(0, Math.min(N - 1, i));
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === idx); });
+    progress.style.width = ((idx + 1) / N * 100) + '%';
+    counter.textContent = pad(idx + 1) + ' / ' + pad(N);
+    parallaxTarget = idx * 140;
+  }
+  function next() { show(idx + 1); }
+  function prev() { show(idx - 1); }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(N - 1); }
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('a, button')) return;
+    next();
+  });
+  var tx = null;
+  document.addEventListener('touchstart', function (e) { tx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (tx === null) return;
+    var dx = e.changedTouches[0].clientX - tx;
+    if (dx < -40) next(); else if (dx > 40) prev();
+    tx = null;
+  }, { passive: true });
+  var canvas = document.getElementById('stars');
+  var ctx = canvas.getContext('2d');
+  var W, H, stars = [];
+  var parallax = 0, parallaxTarget = 0;
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize);
+  resize();
+  function seed() {
+    stars = [];
+    var count = Math.min(220, Math.floor(W * H / 9000));
+    for (var i = 0; i < count; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.6 + 0.3, depth: 0.25 + Math.random() * 0.75, tw: Math.random() * Math.PI * 2, ts: 0.4 + Math.random() * 1.4, drift: 0.06 + Math.random() * 0.22 });
+    }
+  }
+  seed();
+  window.addEventListener('resize', seed);
+  var last = performance.now();
+  function frame(now) {
+    var dt = Math.min(50, now - last) / 1000;
+    last = now;
+    parallax += (parallaxTarget - parallax) * Math.min(1, dt * 2.2);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      s.tw += dt * s.ts;
+      s.y += s.drift * dt * 12;
+      if (s.y > H + 4) { s.y = -4; s.x = Math.random() * W; }
+      var alpha = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(s.tw));
+      var x = (s.x - parallax * s.depth) % W;
+      if (x < 0) x += W;
+      var g = ctx.createRadialGradient(x, s.y, 0, x, s.y, s.r * 4);
+      g.addColorStop(0, 'rgba(255,255,255,' + (alpha * 0.9).toFixed(3) + ')');
+      g.addColorStop(0.35, 'rgba(255,255,255,' + (alpha * 0.28).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, s.y, s.r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  show(0);
+})();
+</script>
+</body>
+</html>

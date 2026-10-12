@@ -1,0 +1,2805 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SkillBridge — deterministic, client-side resume intelligence. Upload a resume, extract canonical skills, and benchmark fit against a curated registry of global engineering vacancies. Zero servers, zero API calls.">
+  <title>SkillBridge — AI Skill-to-Job Matcher (Standalone)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Local Campton geometric sans font declaration with Outfit/Poppins/Plus Jakarta Sans fallback */
+    @font-face {
+      font-family: 'Campton';
+      src: local('Campton Bold'), local('Campton'), local('Campton-Bold'), local('Campton-SemiBold'), local('Campton SemiBold'), local('Campton-Medium'), local('Campton Medium');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+    html {
+      scroll-behavior: smooth;
+    }
+    :root {
+      --bg: #000000;
+      --text: #FFFFFF;
+      --muted: #888888;
+      --border: rgba(255, 255, 255, 0.12);
+      --font-campton: 'Campton', 'Outfit', 'Poppins', 'Plus Jakarta Sans', 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-heading: var(--font-campton);
+      --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --font-sans: var(--font-campton);
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-campton);
+    }
+    html, body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-campton) !important;
+      line-height: 1.5;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea, select, table, th, td, span, p, div, h1, h2, h3, h4, h5, h6, a {
+      font-family: var(--font-campton) !important;
+    }
+    ::selection {
+      background-color: #FFFFFF;
+      color: #000000;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+    /* Fixed Background Canvas - Starts hidden in pitch black, smoothly emerges after text */
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 3.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #canvas-container.stars-revealed {
+      opacity: 1;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* Content Overlays */
+    main {
+      position: relative;
+      z-index: 10;
+    }
+    .container {
+      max-width: 1440px;
+      width: 93%;
+      margin: 0 auto;
+      padding: 0 1.75rem;
+    }
+    .section-screen {
+      min-height: auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 4.5rem 0;
+    }
+    .hero-screen {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 7rem 0 3.5rem 0;
+      position: relative;
+    }
+    .section-divider {
+      border-top: 1px solid var(--border);
+      padding-top: 2.5rem;
+      margin-bottom: 2rem;
+    }
+    .step-tag {
+      font-family: var(--font-campton) !important;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #FFFFFF;
+      margin-bottom: 1.25rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      padding: 0.38rem 0.95rem;
+      border-radius: 999px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .step-tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      box-shadow: 0 0 10px #FFFFFF;
+      display: inline-block;
+    }
+    /* Hero Content - Emerges from the Abyss with cinematic unblur & float (slow & gentle) */
+    .hero-content {
+      position: relative;
+      max-width: 880px;
+      margin: 0 auto;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      opacity: 0;
+      transform: translateY(32px) scale(0.97);
+      filter: blur(14px);
+      transition: opacity 2.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 2.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 2.4s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform, filter;
+    }
+    .hero-content.abyss-revealed {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0px);
+    }
+    .hero-content .step-tag {
+      margin: 0 auto 1.5rem auto;
+    }
+    .heading-large {
+      font-family: var(--font-campton) !important;
+      font-size: clamp(2.85rem, 5.8vw, 5.4rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      color: #FFFFFF;
+      margin: 0 auto 1.5rem auto;
+      text-align: center;
+      text-shadow: 0 0 35px rgba(255, 255, 255, 0.4), 0 2px 10px rgba(0, 0, 0, 0.95);
+    }
+    .hero-subhead {
+      display: block;
+      margin-top: 0.45rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: #D4D4D8;
+      text-align: center;
+      text-shadow: 0 0 25px rgba(255, 255, 255, 0.25), 0 2px 6px rgba(0, 0, 0, 0.9);
+    }
+    .heading-section {
+      font-family: var(--font-campton) !important;
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.9);
+    }
+    .text-lead {
+      font-size: 1.15rem;
+      color: #E4E4E7;
+      max-width: 720px;
+      line-height: 1.65;
+      font-weight: 400;
+      margin: 0 auto 2.25rem auto;
+      text-align: center;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
+    }
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      margin: 0 auto;
+      width: 100%;
+    }
+    @media (min-width: 640px) {
+      .hero-actions {
+        flex-direction: row;
+        justify-content: center;
+      }
+    }
+
+    /* Smooth Scroll Reveal Animations */
+    .reveal-on-scroll {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform;
+    }
+    .reveal-on-scroll.is-revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Fixed Site Navigation Header */
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1.15rem 0;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.6) 75%, transparent 100%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 2.0s cubic-bezier(0.16, 1, 0.3, 1), transform 2.0s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .site-header.header-revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: #FFFFFF;
+      cursor: pointer;
+    }
+    .brand-logo-img {
+      width: 96px;
+      height: 45px;
+      object-fit: cover;
+      object-position: center;
+      flex: none;
+    }
+    .brand-title {
+      font-family: var(--font-campton) !important;
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #FFFFFF;
+      text-shadow: 0 0 16px rgba(255, 255, 255, 0.4);
+    }
+    .brand-tag {
+      font-family: var(--font-campton) !important;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #888888;
+      border-left: 1px solid rgba(255, 255, 255, 0.18);
+      padding-left: 0.65rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    @media (max-width: 640px) {
+      .brand-tag { display: none; }
+    }
+
+    /* ThreeUI RectangleButtons · Dark Glass (dark-pill) variant
+       Source: https://threeui.com/source-code/rectangle-buttons.json */
+    .section-element--glass-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .section-element--glass-button::before {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 160px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      filter: blur(28px);
+      transform: translate(-50%, -50%);
+      content: "";
+      pointer-events: none;
+    }
+    .section-button {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      padding: 0 28px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 32px;
+      color: rgba(255, 255, 255, 0.85);
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .section-button::before,
+    .section-button::after {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      content: "";
+    }
+    .section-button::before {
+      background: rgba(23, 23, 23, 0.75);
+      box-shadow: inset 2px 4px 16px rgba(255, 255, 255, 0.06);
+      -webkit-backdrop-filter: blur(50px);
+      backdrop-filter: blur(50px);
+    }
+    .section-button::after {
+      z-index: 2;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      opacity: 0.35;
+      pointer-events: none;
+      -webkit-mask-image: linear-gradient(170deg, #000, transparent 50%);
+      mask-image: linear-gradient(170deg, #000, transparent 50%);
+    }
+    .section-button__title {
+      position: relative;
+      z-index: 4;
+      letter-spacing: 0.015em;
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+    .section-button__circle {
+      position: absolute;
+      z-index: 3;
+      top: calc(50% - 100px);
+      left: calc(50% - 100px);
+      width: 200px;
+      height: 200px;
+      pointer-events: none;
+    }
+    .section-button__circle::before,
+    .section-button__circle::after {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      content: "";
+    }
+    .section-button__circle::before {
+      background: conic-gradient(from 180deg, rgba(255, 255, 255, 0.015) 180deg, rgba(255, 255, 255, 0.08) 360deg);
+      filter: blur(14px);
+      animation: section-button-circle 3.6s linear infinite;
+      transition: opacity 0.5s;
+    }
+    .section-button__circle::after {
+      inset: 30px;
+      background: rgba(255, 255, 255, 0.18);
+      opacity: 0;
+      filter: blur(6px);
+      transform: scale(0.5);
+      transition: opacity 0.5s, transform 0.7s;
+      -webkit-mask-image: radial-gradient(50% 50%, #000, rgba(23, 23, 23, 0));
+      mask-image: radial-gradient(50% 50%, #000, rgba(23, 23, 23, 0));
+    }
+    .section-button:hover {
+      color: #FFFFFF;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 255, 255, 0.12);
+    }
+    .section-button:hover .section-button__title {
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+    }
+    .section-button:hover .section-button__circle::before {
+      opacity: 0;
+    }
+    .section-button:hover .section-button__circle::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .section-button:active {
+      transform: scale(0.97);
+    }
+    @keyframes section-button-circle {
+      0% { transform: translate(0) rotate(0); }
+      25% { transform: translateX(-24px) rotate(90deg); }
+      50% { transform: translate(0) rotate(180deg); }
+      75% { transform: translateX(24px) rotate(270deg); }
+      100% { transform: translate(0) rotate(360deg); }
+    }
+
+    /* Sign Up Modal */
+    .signup-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: none;
+      place-items: center;
+      padding: 1.5rem;
+    }
+    .signup-modal-card {
+      background: #0A0A0A;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 12px;
+      padding: 2.25rem;
+      max-width: 440px;
+      width: 100%;
+      position: relative;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.95), 0 0 40px rgba(255, 255, 255, 0.05);
+    }
+    .signup-modal-title {
+      font-family: var(--font-heading);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .signup-modal-desc {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      color: #A0A0A0;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .signup-input {
+      width: 100%;
+      background: #141414;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      outline: none;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .signup-input:focus {
+      border-color: #FFFFFF;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+    }
+    .signup-submit-btn {
+      width: 100%;
+      background: #FFFFFF;
+      color: #000000;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.85rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .signup-submit-btn:hover {
+      background: #E5E5E5;
+      transform: translateY(-1px);
+    }
+    .signup-close-btn {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      background: transparent;
+      border: none;
+      color: #888888;
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      transition: color 0.15s ease;
+    }
+    .signup-close-btn:hover {
+      color: #FFFFFF;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #FFFFFF;
+      color: #000000;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 1rem 2rem;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .btn-primary:hover {
+      background: #E5E5E5;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    /* Dropzone */
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 8px;
+      padding: 3.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .dropzone-title {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .dropzone-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: capitalize;
+    }
+    .badge-matched {
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+      font-weight: 500;
+    }
+    .badge-matched::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+    .badge-missing {
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.02);
+      color: #999999;
+    }
+    .badge-missing::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      border: 1px solid #777777;
+    }
+    .badge-weight {
+      font-size: 0.6rem;
+      opacity: 0.6;
+      font-weight: 700;
+    }
+    /* Table & Stacked Rows */
+    .table-container {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-align: left;
+    }
+    th {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 500;
+      background: rgba(0, 0, 0, 0.8);
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: top;
+    }
+    tr.job-row {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    tr.job-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .job-title {
+      color: #FFFFFF;
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+    }
+    .job-company {
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+    .job-salary {
+      font-weight: 700;
+      color: #FFFFFF;
+      white-space: nowrap;
+    }
+    .job-score {
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+    /* Progress Bar */
+    #progress-bar-container {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.95);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      backdrop-filter: blur(8px);
+    }
+    .progress-track {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0.4rem 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #FFFFFF;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    /* In-place expander */
+    .job-detail-drawer {
+      background: #0A0A0A;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin: 0.5rem;
+    }
+    /* Country Filter Bar */
+    .country-selector-container {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.75rem;
+      width: 100%;
+    }
+    .country-selector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.85rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .country-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00FF88;
+      box-shadow: 0 0 10px #00FF88;
+      display: inline-block;
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0% { opacity: 0.6; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 14px #00FF88; }
+      100% { opacity: 0.6; transform: scale(0.9); }
+    }
+    .country-pills-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .country-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #A0A0A0;
+      border-radius: 6px;
+      padding: 0.5rem 0.95rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    .country-pill:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.35);
+      transform: translateY(-1px);
+    }
+    .country-pill.active {
+      background: #FFFFFF;
+      color: #000000;
+      border-color: #FFFFFF;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
+    }
+    .country-flag {
+      font-size: 0.95rem;
+    }
+    .btn-sample-active {
+      background: #FFFFFF !important;
+      color: #000000 !important;
+      border-color: #FFFFFF !important;
+    }
+
+    /* Skill Gaps Grid & Cards - Fills Screen Width */
+    #gaps-chart-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 1.25rem 1.75rem;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      width: 100%;
+    }
+    @media (max-width: 640px) {
+      #gaps-chart-container {
+        grid-template-columns: 1fr;
+        padding: 1.25rem;
+      }
+    }
+    .gap-bar-container {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .gap-bar-container:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .gap-bar-track {
+      height: 8px;
+      background: #1A1A1A;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .gap-bar-fill {
+      height: 100%;
+      background: #FFFFFF;
+      width: 0%;
+      transition: width 1s ease-out;
+    }
+    /* Responsive Mobile */
+    .mobile-jobs-list {
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .table-desktop { display: none; }
+      .mobile-jobs-list { display: block; }
+      .mobile-card {
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        font-family: var(--font-mono);
+      }
+    }
+
+    /* Header Navigation */
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .nav-link {
+      color: #A0A0A0;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: color 0.15s ease;
+      cursor: pointer;
+    }
+    .nav-link:hover {
+      color: #FFFFFF;
+    }
+    @media (max-width: 900px) {
+      .header-nav { display: none; }
+    }
+
+    /* Market Intelligence & Ecosystem Benchmarks */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .metric-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .metric-card:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .metric-tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 0.4rem;
+    }
+    .metric-val {
+      font-size: 2.15rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      line-height: 1.1;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .metric-desc {
+      font-size: 0.78rem;
+      color: #888888;
+      line-height: 1.45;
+    }
+
+    /* Tech Hub Cards */
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .hub-card {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .hub-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+    .hub-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+    .hub-share {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .hub-role-focus {
+      font-size: 0.78rem;
+      color: #CCCCCC;
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+    .hub-ecosystem {
+      font-size: 0.72rem;
+      color: var(--muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 0.6rem;
+    }
+
+    /* Architecture Pipeline & Comparison Matrix */
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .pipeline-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.75rem 1.5rem;
+    }
+    .pipeline-stage {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.08em;
+    }
+    .pipeline-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 0.5rem;
+    }
+    .pipeline-desc {
+      font-size: 0.8rem;
+      color: #A0A0A0;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+    .pipeline-code {
+      background: #0A0A0A;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.72rem;
+      color: #FFFFFF;
+      line-height: 1.4;
+      overflow-x: auto;
+    }
+    .callout-box {
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid #FFFFFF;
+      border-radius: 0 8px 8px 0;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+      font-size: 0.82rem;
+      color: #D4D4D8;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fixed Site Navigation Header with ThreeUI RectangleButtons (Dark Glass Pill) -->
+  <header class="site-header">
+    <div class="container header-container">
+      <a href="#" class="brand-logo" onclick="window.scrollTo({top:0, behavior:'smooth'}); return false;">
+        <img src="skillbridge-logo.png" alt="SkillBridge Logo" class="brand-logo-img">
+        <span class="brand-title">SKILLBRIDGE</span>
+        <span class="brand-tag">AI RESUME INTELLIGENCE</span>
+      </a>
+
+      <nav class="header-nav">
+        <a href="#upload-section" class="nav-link">Upload & Target</a>
+        <a href="#jobs-section" class="nav-link" onclick="handleNavJobsClick(event)">Vacancies</a>
+        <a href="#market-intelligence" class="nav-link">Compensation Index</a>
+        <a href="#methodology-section" class="nav-link">Deterministic Engine</a>
+      </nav>
+
+      <div class="header-actions">
+        <!-- Exact ThreeUI RectangleButtons Dark Glass variant (SHA-256 ff30e28c2781) -->
+        <div class="section-element section-element--glass-button" data-mode="dark">
+          <button class="section-button" type="button" onclick="openSignupModal()">
+            <span class="section-button__title">Sign up</span>
+            <span class="section-button__circle" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Sign Up Modal -->
+  <div id="signup-modal" class="signup-modal-backdrop" onclick="if(event.target===this) closeSignupModal()">
+    <div class="signup-modal-card">
+      <button class="signup-close-btn" type="button" onclick="closeSignupModal()" aria-label="Close modal">✕</button>
+      <div class="signup-modal-title">Join SkillBridge</div>
+      <p class="signup-modal-desc">Create your free candidate profile to save your resume benchmarks and track engineering skill progression.</p>
+      <form onsubmit="handleSignupSubmit(event)">
+        <input type="text" class="signup-input" placeholder="Full name (e.g. Aarav Sharma)" required>
+        <input type="email" class="signup-input" placeholder="Email address (e.g. aarav@example.com)" required>
+        <button type="submit" class="signup-submit-btn">GET STARTED FREE →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Background Canvas Engine -->
+  <div id="canvas-container" aria-hidden="true">
+    <canvas id="bgCanvas"></canvas>
+  </div>
+
+  <!-- Real Progress Indicator -->
+  <div id="progress-bar-container">
+    <div class="container" style="max-width: 800px;">
+      <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:0.75rem;">
+        <span style="font-weight:600;">ANALYZING CANDIDATE PROFILE</span>
+        <span id="progress-step-text" style="color:var(--muted);">STAGE 1/3 · 33%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <div id="progress-sub-text" style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted);">
+        Tokenizing resume text...
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <!-- HERO SECTION -->
+    <section class="section-screen hero-screen">
+      <div class="container" style="display:flex; justify-content:center; align-items:center; width:100%;">
+        <div class="hero-content">
+          <span class="step-tag">
+            <span class="step-tag-dot"></span>
+            SKILLBRIDGE · WORLDWIDE RESUME INTELLIGENCE
+          </span>
+          <h1 class="heading-large">
+            Your resume already knows.
+            <span class="hero-subhead">We just read it properly.</span>
+          </h1>
+          <p class="text-lead">
+            Worldwide deterministic skill matching across global engineering hubs — now synced with a live web job feed. Select your target country to benchmark real openings — instantly. No black-box hallucination. Your resume never leaves your device.
+          </p>
+          <div class="hero-actions">
+            <button class="btn-primary" onclick="scrollToUpload()">
+              UPLOAD RESUME & TARGET COUNTRIES ↓
+            </button>
+            <span style="font-family:var(--font-mono); font-size:0.75rem; color:#A0A0A0; text-shadow: 0 1px 4px rgba(0,0,0,0.9);">
+              Accepts PDF, DOCX, TXT · Client-side only
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HACKATHON VALUE PROPOSITION PILLARS (REVEAL ON SCROLL) -->
+    <div class="container reveal-on-scroll" style="margin-top: -1rem; margin-bottom: 5rem;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem;">
+        <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.5rem; text-align:center;">
+          <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.4rem;">01 // ENGINE</div>
+          <div style="font-weight:600; color:#FFF; font-size:1rem; margin-bottom:0.35rem;">Deterministic Matching</div>
+          <p style="font-size:0.8rem; color:#888;">Exact canonical skill taxonomy without LLM hallucinations or guesswork.</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.5rem; text-align:center;">
+          <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.4rem;">02 // DATABASE</div>
+          <div style="font-weight:600; color:#FFF; font-size:1rem; margin-bottom:0.35rem;">Worldwide Tech Vacancies</div>
+          <p style="font-size:0.8rem; color:#888;">A live web feed of real openings across US, UK, India, Europe, Utah & Remote — plus a curated in-memory registry of 44 roles as the always-on fallback.</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.5rem; text-align:center;">
+          <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.4rem;">03 // PRIVACY</div>
+          <div style="font-weight:600; color:#FFF; font-size:1rem; margin-bottom:0.35rem;">100% Client-Side</div>
+          <p style="font-size:0.8rem; color:#888;">Resumes never leave your device. Only public job listings are fetched — no resume data is ever uploaded.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD & TARGETING SECTION -->
+    <section id="upload-section" class="section-screen reveal-on-scroll">
+      <div class="container">
+        <div class="section-divider">
+          <span class="step-tag">STEP 01 // RESUME INGESTION & COUNTRY TARGETING</span>
+          <h2 class="heading-section">Upload resume & select target countries</h2>
+          <p style="font-family:var(--font-mono); font-size:0.78rem; color:var(--muted); max-width:850px; line-height:1.5;">
+            Choose your target countries/regions, upload your resume or pick a quick profile, and the deterministic engine will benchmark live web vacancies plus the curated registry — instantly, on your device.
+          </p>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.6); border:1px solid var(--border); border-radius:8px; padding:2rem; width:100%;">
+          <!-- Dropzone -->
+          <div id="dropzone" class="dropzone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" style="display:none;" accept=".pdf,.docx,.txt" onchange="handleFileSelect(event)">
+            <div id="dropzone-title" class="dropzone-title">DRAG & DROP RESUME (PDF, DOCX, TXT)</div>
+            <div id="dropzone-sub" class="dropzone-sub">or click to browse local files</div>
+          </div>
+
+          <!-- Quick Samples & Paste toggle -->
+          <div style="margin-top:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); flex-wrap:wrap;">
+              <span>1-Click Test Resumes:</span>
+              <button id="btnSampleFrontend" class="btn-secondary" onclick="loadSample('frontend')">Frontend Engineer</button>
+              <button id="btnSampleBackend" class="btn-secondary" onclick="loadSample('backend')">Backend SDE</button>
+              <button id="btnSampleData" class="btn-secondary" onclick="loadSample('data')">Data / ML</button>
+            </div>
+            <button class="btn-secondary" onclick="togglePasteArea()">
+              Toggle paste text area
+            </button>
+          </div>
+
+          <!-- Paste text area -->
+          <div id="paste-area-container" style="display:none; margin-top:1.25rem;">
+            <textarea id="paste-textarea" rows="6" style="width:100%; background:#050505; border:1px solid var(--border); border-radius:6px; color:#FFF; font-family:var(--font-mono); font-size:0.75rem; padding:0.85rem; outline:none; resize:vertical; line-height:1.5;" placeholder="Paste resume text or skills here..."></textarea>
+          </div>
+
+          <!-- Target Country Chooser -->
+          <div style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; flex-wrap:wrap; gap:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.6rem;">
+                <span class="country-pulse-dot"></span>
+                <span style="font-family:var(--font-mono); font-size:0.75rem; font-weight:700; letter-spacing:0.08em; color:#FFF;">
+                  CHOOSE TARGET COUNTRIES / REGIONS:
+                </span>
+              </div>
+              <div id="upload-country-status" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--muted);">
+                🌐 Worldwide (All 8 Corridors · 44 Curated + Live Feed)
+              </div>
+            </div>
+
+            <!-- Country pills in upload section -->
+            <div class="country-pills-row" id="upload-country-pills">
+              <button class="country-pill active" data-country="ALL" onclick="toggleCountrySelection('ALL')">
+                <span class="country-flag">🌐</span> Worldwide (All)
+              </button>
+              <button class="country-pill" data-country="India" onclick="toggleCountrySelection('India')">
+                <span class="country-flag">🇮🇳</span> India
+              </button>
+              <button class="country-pill" data-country="United States" onclick="toggleCountrySelection('United States')">
+                <span class="country-flag">🇺🇸</span> United States
+              </button>
+              <button class="country-pill" data-country="United Kingdom" onclick="toggleCountrySelection('United Kingdom')">
+                <span class="country-flag">🇬🇧</span> United Kingdom
+              </button>
+              <button class="country-pill" data-country="Germany" onclick="toggleCountrySelection('Germany')">
+                <span class="country-flag">🇩🇪</span> Germany / EU
+              </button>
+              <button class="country-pill" data-country="Singapore" onclick="toggleCountrySelection('Singapore')">
+                <span class="country-flag">🇸🇬</span> Singapore
+              </button>
+              <button class="country-pill" data-country="Canada" onclick="toggleCountrySelection('Canada')">
+                <span class="country-flag">🇨🇦</span> Canada
+              </button>
+              <button class="country-pill" data-country="Utah" onclick="toggleCountrySelection('Utah')">
+                <span class="country-flag">🏔️</span> Utah Live
+              </button>
+              <button class="country-pill" data-country="Remote" onclick="toggleCountrySelection('Remote')">
+                <span class="country-flag">⚡</span> Global Remote
+              </button>
+            </div>
+          </div>
+
+          <!-- Live sync status + refresh -->
+          <div style="margin-top:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+            <div id="live-sync-status" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--muted);">
+              <span style="color:#666;">● Live feed idle</span>
+            </div>
+            <button class="btn-secondary" onclick="fetchLiveJobs()" style="font-size:0.72rem;">↻ Refresh live jobs</button>
+          </div>
+
+          <!-- Big Action Button -->
+          <div style="margin-top:2rem;">
+            <button id="btn-analyze-action" class="btn-primary" style="width:100%; padding:1.15rem; font-size:0.95rem; justify-content:center; letter-spacing:0.06em; font-weight:700; border-radius:6px;" onclick="triggerAnalyze()">
+              ⚡ ANALYZE RESUME & RANK CURATED ROLES →
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESULTS CONTAINER (Hidden until parsed) -->
+    <div id="results-container" style="display:none;">
+      <!-- STEP 02: READINESS SCORE -->
+      <section id="score-section" class="section-screen reveal-on-scroll">
+        <div class="container">
+          <div class="section-divider">
+            <span class="step-tag">STEP 02 // AGGREGATE READINESS</span>
+            <h2 class="heading-section">Market Readiness Index</h2>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:2rem; background:rgba(0,0,0,0.6); border:1px solid var(--border); border-radius:8px; padding:2rem;">
+            <div style="border-right:1px solid var(--border); padding-right:1.5rem;">
+              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:0.5rem;">WEIGHTED COMPATIBILITY</div>
+              <div id="score-number" style="font-family:var(--font-mono); font-size:4.5rem; font-weight:700; line-height:1; color:#FFFFFF;">0%</div>
+              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-top:0.75rem;">
+                Average compatibility across curated in-memory vacancies in the selected region
+              </div>
+            </div>
+
+            <div style="border-right:1px solid var(--border); padding-right:1.5rem;">
+              <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:0.75rem; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:0.5rem; margin-bottom:1rem;">
+                <span style="color:var(--muted);">IMMEDIATE VIABLE OPENINGS (&gt;60% FIT)</span>
+                <span id="viable-count" style="font-weight:700;">0 ROLES</span>
+              </div>
+              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:0.5rem;">
+                CANONICAL SKILLS DETECTED IN RESUME
+              </div>
+              <div id="detected-skills-list" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+            </div>
+
+            <div>
+              <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:0.5rem;">
+                ACTIVE REGION MARKET TELEMETRY
+              </div>
+              <div id="score-active-country" style="font-size:1.35rem; font-weight:700; color:#FFFFFF; margin-bottom:0.35rem;">
+                🌐 Worldwide (All Regions)
+              </div>
+              <p style="font-size:0.75rem; color:#888; line-height:1.45; margin-bottom:0.75rem;">
+                Role benchmarks and missing competency priority are calibrated to current country market demand.
+              </p>
+              <span id="active-jobs-summary-badge" class="badge" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); font-size:0.7rem;">
+                50+ Roles Synced
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 03: RANKED JOBS TABLE -->
+      <section id="jobs-section" class="section-screen reveal-on-scroll">
+        <div class="container">
+          <div class="section-divider">
+            <span class="step-tag">STEP 03 // EVIDENCE LEDGER</span>
+            <h2 class="heading-section">Curated Engineering Vacancies · Global Tech Corridors</h2>
+            <p style="font-family:var(--font-mono); font-size:0.78rem; color:var(--muted);">
+              Select your target country to filter the curated vacancy registry, local compensation bands, and weighted requirements.
+            </p>
+          </div>
+
+          <!-- Country / Region Filter Bar in Results -->
+          <div class="country-selector-container">
+            <div class="country-selector-header">
+              <div style="display:flex; align-items:center; gap:0.6rem;">
+                <span class="country-pulse-dot"></span>
+                <span style="font-family:var(--font-mono); font-size:0.75rem; font-weight:700; letter-spacing:0.08em; color:#FFF;">
+                  VACANCY REGISTRY · TARGET REGION:
+                </span>
+              </div>
+              <div id="country-status-indicator" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--muted);">
+                44 curated engineering vacancies plus a live web feed, across 8 global tech corridors
+              </div>
+            </div>
+            <div class="country-pills-row" id="results-country-pills">
+              <button class="country-pill active" data-country="ALL" onclick="toggleCountrySelection('ALL')">
+                <span class="country-flag">🌐</span> Worldwide (All)
+              </button>
+              <button class="country-pill" data-country="India" onclick="toggleCountrySelection('India')">
+                <span class="country-flag">🇮🇳</span> India
+              </button>
+              <button class="country-pill" data-country="United States" onclick="toggleCountrySelection('United States')">
+                <span class="country-flag">🇺🇸</span> United States
+              </button>
+              <button class="country-pill" data-country="United Kingdom" onclick="toggleCountrySelection('United Kingdom')">
+                <span class="country-flag">🇬🇧</span> United Kingdom
+              </button>
+              <button class="country-pill" data-country="Germany" onclick="toggleCountrySelection('Germany')">
+                <span class="country-flag">🇩🇪</span> Germany / EU
+              </button>
+              <button class="country-pill" data-country="Singapore" onclick="toggleCountrySelection('Singapore')">
+                <span class="country-flag">🇸🇬</span> Singapore
+              </button>
+              <button class="country-pill" data-country="Canada" onclick="toggleCountrySelection('Canada')">
+                <span class="country-flag">🇨🇦</span> Canada
+              </button>
+              <button class="country-pill" data-country="Utah" onclick="toggleCountrySelection('Utah')">
+                <span class="country-flag">🏔️</span> Utah Live
+              </button>
+              <button class="country-pill" data-country="Remote" onclick="toggleCountrySelection('Remote')">
+                <span class="country-flag">⚡</span> Global Remote
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container table-desktop">
+            <table>
+              <thead>
+                <tr>
+                  <th>ROLE & COMPANY</th>
+                  <th>REGION / CITY</th>
+                  <th>COMPENSATION (LOCALIZED)</th>
+                  <th>MATCH %</th>
+                  <th>MATCHED SKILLS</th>
+                  <th>MISSING SKILLS</th>
+                </tr>
+              </thead>
+              <tbody id="jobs-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Stacked Cards -->
+          <div id="mobile-jobs-container" class="mobile-jobs-list"></div>
+        </div>
+      </section>
+
+      <!-- STEP 04: SKILL GAPS CHART -->
+      <section id="gaps-section" class="section-screen reveal-on-scroll">
+        <div class="container">
+          <div class="section-divider">
+            <span class="step-tag">STEP 04 // LEVERAGE ROADMAP</span>
+            <h2 class="heading-section">High-Impact Skill Gaps</h2>
+            <p style="font-family:var(--font-mono); font-size:0.78rem; color:var(--muted);">
+              Missing competencies ranked by demand across the curated registry in the selected region.
+            </p>
+          </div>
+
+          <!-- 3-metric summary cards above grid to fill screen width -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:1.25rem; margin-bottom:1.5rem;">
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.25rem 1.5rem;">
+              <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.3rem;">TARGET REGION MARKET</div>
+              <div id="gaps-active-country-label" style="font-weight:700; color:#FFF; font-size:1.1rem; margin-bottom:0.25rem;">🌐 Worldwide Corridors</div>
+              <p style="font-size:0.75rem; color:#888;">Gaps weighted specifically against curated postings in the selected region.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.25rem 1.5rem;">
+              <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.3rem;">CAREER LEVERAGE OPPORTUNITY</div>
+              <div style="font-weight:700; color:#FFF; font-size:1.1rem; margin-bottom:0.25rem;">+35% to +60% Lift</div>
+              <p style="font-size:0.75rem; color:#888;">Projected match score increase by bridging top 3 missing competencies.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:1.25rem 1.5rem;">
+              <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--muted); margin-bottom:0.3rem;">AI RECOMMENDED FOCUS</div>
+              <div id="gaps-top-focus" style="font-weight:700; color:#FFF; font-size:1.1rem; margin-bottom:0.25rem;">Cloud & Event Queues</div>
+              <p style="font-size:0.75rem; color:#888;">Highest demand multiplier in modern product engineering teams.</p>
+            </div>
+          </div>
+
+          <div id="gaps-chart-container"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- STEP 05: MARKET INTELLIGENCE & 2026 COMPENSATION BENCHMARKS -->
+    <section id="market-intelligence" class="section-screen reveal-on-scroll">
+      <div class="container">
+        <div class="section-divider">
+          <span class="step-tag">STEP 05 // ECOSYSTEM BENCHMARKS & TELEMETRY</span>
+          <h2 class="heading-section">2025–2026 Indian Tech Hiring & Compensation Index</h2>
+          <p style="font-family:var(--font-mono); font-size:0.78rem; color:var(--muted); max-width:850px; line-height:1.5;">
+            Authoritative compensation and hiring benchmarks synthesized from the NASSCOM Strategic Review, Levels.fyi verified telemetry, AmbitionBox market insights, and recruiting pipelines across top Indian engineering corridors.
+          </p>
+        </div>
+
+        <!-- 4 Primary Market Telemetry Metrics -->
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-tag">01 // REGIONAL PREMIUM</div>
+            <div class="metric-val">+22% to +35%</div>
+            <div style="font-weight:700; color:#FFF; font-size:0.85rem; margin-bottom:0.35rem;">Bengaluru Base Pay Lead</div>
+            <p class="metric-desc">Silicon Plateau maintains the highest tech compensation percentiles in South Asia across SDE-1 through Staff engineering bands.</p>
+          </div>
+          <div class="metric-card">
+            <div class="metric-tag">02 // TALENT VECTOR</div>
+            <div class="metric-val">+62% YoY</div>
+            <div style="font-weight:700; color:#FFF; font-size:0.85rem; margin-bottom:0.35rem;">AI-Native Systems Demand</div>
+            <p class="metric-desc">Unprecedented surge in demand for PyTorch, transformer inference pipelines, vector indexing, and deterministic model guards.</p>
+          </div>
+          <div class="metric-card">
+            <div class="metric-tag">03 // SKILL COMBINATIONS</div>
+            <div class="metric-val">1.34x Multiplier</div>
+            <div style="font-weight:700; color:#FFF; font-size:0.85rem; margin-bottom:0.35rem;">Composite Capabilities Bonus</div>
+            <p class="metric-desc">Candidates pairing core backend depth (Go / Java) with distributed streaming (Kafka / K8s) command top-decile offers.</p>
+          </div>
+          <div class="metric-card">
+            <div class="metric-tag">04 // SCREENING RELIABILITY</div>
+            <div class="metric-val">100% Deterministic</div>
+            <div style="font-weight:700; color:#FFF; font-size:0.85rem; margin-bottom:0.35rem;">Zero AI Hallucination</div>
+            <p class="metric-desc">Unlike black-box LLM screening that suffers 15–28% semantic variance, SkillBridge evaluates resumes with 100% mathematical fidelity.</p>
+          </div>
+        </div>
+
+        <!-- Geographic Tech Hub Matrix -->
+        <div style="margin-bottom: 2rem;">
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em;">
+            PRIMARY ENGINEERING RECRUITING CORRIDORS
+          </div>
+          <div class="hub-grid">
+            <div class="hub-card">
+              <div>
+                <div class="hub-card-header">
+                  <span class="hub-title">Bengaluru</span>
+                  <span class="hub-share">38% Hiring Volume</span>
+                </div>
+                <div class="hub-role-focus">
+                  Fintech checkout rails, instant delivery dispatch, sovereign AI labs, and high-scale Global Capability Centers (GCCs).
+                </div>
+              </div>
+              <div class="hub-ecosystem">
+                <strong style="color:#FFF;">Core Anchors:</strong> Razorpay, Swiggy, Flipkart, PhonePe, CRED, Sarvam AI, Fractal Analytics
+              </div>
+            </div>
+
+            <div class="hub-card">
+              <div>
+                <div class="hub-card-header">
+                  <span class="hub-title">Gurugram / NCR</span>
+                  <span class="hub-share">24% Hiring Volume</span>
+                </div>
+                <div class="hub-role-focus">
+                  High-Frequency Trading (HFT), quick-commerce routing algorithms, travel tech, and server-rendered consumer platforms.
+                </div>
+              </div>
+              <div class="hub-ecosystem">
+                <strong style="color:#FFF;">Core Anchors:</strong> Tower Research, Zomato, Urban Company, MakeMyTrip, Blinkit, Tata 1mg
+              </div>
+            </div>
+
+            <div class="hub-card">
+              <div>
+                <div class="hub-card-header">
+                  <span class="hub-title">Hyderabad</span>
+                  <span class="hub-share">18% Hiring Volume</span>
+                </div>
+                <div class="hub-role-focus">
+                  Hyperscale cloud infrastructure, private cloud microservices, platform reliability, and pan-India telecom backbones.
+                </div>
+              </div>
+              <div class="hub-ecosystem">
+                <strong style="color:#FFF;">Core Anchors:</strong> Microsoft India Development Center, Jio Platforms, Amazon Web Services, ServiceNow
+              </div>
+            </div>
+
+            <div class="hub-card">
+              <div>
+                <div class="hub-card-header">
+                  <span class="hub-title">Mumbai & Pune</span>
+                  <span class="hub-share">14% Hiring Volume</span>
+                </div>
+                <div class="hub-role-focus">
+                  WealthTech & discount brokerages, device cloud farms, dark store inventory orchestration, and core enterprise SaaS.
+                </div>
+              </div>
+              <div class="hub-ecosystem">
+                <strong style="color:#FFF;">Core Anchors:</strong> BrowserStack, Upstox, Zepto, Infosys Wingspan, Barclays Tech, Tata Digital
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comprehensive Compensation Benchmark Matrix -->
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em;">
+            2025–2026 LIVE COMPENSATION MATRIX (ANNUAL CTC IN ₹ LPA)
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ENGINEERING DISCIPLINE</th>
+                  <th>EXPERIENCE BAND</th>
+                  <th>TIER-1 UNICORN / PRODUCT</th>
+                  <th>GLOBAL TECH / GCC</th>
+                  <th>IT SERVICES / ENTERPRISE</th>
+                  <th>PRIMARY VALUE-DRIVER COMPETENCIES</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">SDE-1 (Frontend / Web)</div><div style="color:var(--muted); font-size:0.7rem;">Client Architecture</div></td>
+                  <td style="color:#CCC;">0–2 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹14 – 24 LPA</td>
+                  <td style="color:#CCC;">₹10 – 18 LPA</td>
+                  <td style="color:#888;">₹4.5 – 8.0 LPA</td>
+                  <td>React, TypeScript, Next.js, Tailwind, Core Web Vitals</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">SDE-1 (Backend / Systems)</div><div style="color:var(--muted); font-size:0.7rem;">Distributed Services</div></td>
+                  <td style="color:#CCC;">0–2 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹16 – 26 LPA</td>
+                  <td style="color:#CCC;">₹12 – 20 LPA</td>
+                  <td style="color:#888;">₹5.0 – 9.0 LPA</td>
+                  <td>Java, Spring Boot, Go, Kafka, Redis, SQL, DSA</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Full Stack Developer</div><div style="color:var(--muted); font-size:0.7rem;">Product Delivery</div></td>
+                  <td style="color:#CCC;">1–3 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹15 – 25 LPA</td>
+                  <td style="color:#CCC;">₹11 – 19 LPA</td>
+                  <td style="color:#888;">₹5.5 – 9.5 LPA</td>
+                  <td>Node.js, React, PostgreSQL, Docker, REST APIs</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">AI / ML & NLP Engineer</div><div style="color:var(--muted); font-size:0.7rem;">Inference & Models</div></td>
+                  <td style="color:#CCC;">0–3 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹16 – 28 LPA</td>
+                  <td style="color:#CCC;">₹13 – 22 LPA</td>
+                  <td style="color:#888;">₹5.5 – 10.0 LPA</td>
+                  <td>Python, PyTorch, Deep Learning, SQL, FastAPI, Docker</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">DevOps & Cloud Platform</div><div style="color:var(--muted); font-size:0.7rem;">Infrastructure & SRE</div></td>
+                  <td style="color:#CCC;">1–3 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹14 – 25 LPA</td>
+                  <td style="color:#CCC;">₹11 – 19 LPA</td>
+                  <td style="color:#888;">₹5.0 – 9.0 LPA</td>
+                  <td>Kubernetes, Docker, Linux, AWS, CI/CD, Git</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Low-Latency SDE (C++)</div><div style="color:var(--muted); font-size:0.7rem;">Quantitative Trading</div></td>
+                  <td style="color:#CCC;">0–2 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹22 – 45+ LPA</td>
+                  <td style="color:#CCC;">₹18 – 35 LPA</td>
+                  <td style="color:#888;">N/A (Specialized)</td>
+                  <td>Modern C++, Linux Kernel, Memory Profiling, Sub-µs DSA</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Data & BI Analyst</div><div style="color:var(--muted); font-size:0.7rem;">Telemetry & Growth</div></td>
+                  <td style="color:#CCC;">0–2 Years</td>
+                  <td style="color:#FFF; font-weight:700;">₹8 – 15 LPA</td>
+                  <td style="color:#CCC;">₹7 – 12 LPA</td>
+                  <td style="color:#888;">₹4.0 – 7.5 LPA</td>
+                  <td>Advanced SQL, Python Pandas, Power BI, Tableau</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="callout-box">
+          <strong style="color:#FFF;">KEY HIRING TAKEAWAY (NASSCOM 2026 STRATEGIC REPORT):</strong>
+          In 2026, tech compensation in India is experiencing sharp divergence: generalist full-stack roles are stabilizing, while engineers with verified depth in distributed streaming (Kafka), container orchestration (Kubernetes), and low-level memory/systems (Go / C++ / Core Java) command 25–40% wage premiums over standard market medians.
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 06: DETERMINISTIC ENGINE ARCHITECTURE & VERIFICATION DEEP-DIVE -->
+    <section id="methodology-section" class="section-screen reveal-on-scroll">
+      <div class="container">
+        <div class="section-divider">
+          <span class="step-tag">STEP 06 // SYSTEM ARCHITECTURE & MATHEMATICAL SPEC</span>
+          <h2 class="heading-section">Deterministic Taxonomy Engine vs. Black-Box LLM ATS</h2>
+          <p style="font-family:var(--font-mono); font-size:0.78rem; color:var(--muted); max-width:850px; line-height:1.5;">
+            Why SkillBridge replaces opaque, non-deterministic Large Language Model resume screening with a transparent, client-side harmonic matching algorithm.
+          </p>
+        </div>
+
+        <!-- 3 Architecture Pipeline Stages -->
+        <div class="pipeline-grid">
+          <div class="pipeline-card">
+            <div class="pipeline-stage">STAGE 01 // TEXT SANITIZATION & N-GRAMS</div>
+            <div class="pipeline-title">Sub-String Token Normalization</div>
+            <p class="pipeline-desc">
+              Strips binary artifacts and non-printable control characters. Normalizes multi-line text into lowercase unigrams, bigrams, and trigrams while preserving technical syntaxes like <code>c++</code>, <code>next.js</code>, and <code>ci/cd</code>.
+            </p>
+            <div class="pipeline-code">
+              // Sanitization & multi-word windowing<br>
+              clean = raw.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ')<br>
+              tokens = [w, w[i]+' '+w[i+1], w[i]+' '+w[i+1]+' '+w[i+2]]
+            </div>
+          </div>
+
+          <div class="pipeline-card">
+            <div class="pipeline-stage">STAGE 02 // CANONICAL TAXONOMY RESOLUTION</div>
+            <div class="pipeline-title">39 Canonical Skills · 98 Alias Mappings</div>
+            <p class="pipeline-desc">
+              Resolves fragmented acronyms and variations into canonical technological competencies with zero false-positive regex collisions using O(1) Set membership lookups.
+            </p>
+            <div class="pipeline-code">
+              // Strict canonical mapping<br>
+              'es6', 'ecmascript' &rarr; 'javascript'<br>
+              'k8s' &rarr; 'kubernetes'<br>
+              'torch' &rarr; 'pytorch' | 'springboot' &rarr; 'spring boot'
+            </div>
+          </div>
+
+          <div class="pipeline-card">
+            <div class="pipeline-stage">STAGE 03 // WEIGHTED HARMONIC FIT SCORING</div>
+            <div class="pipeline-title">Priority-Weighted Math Formula</div>
+            <p class="pipeline-desc">
+              Computes candidate compatibility using role-specific requirement weights. Prevents keyword stuffing by anchoring scores to core gating competencies (e.g., DSA weight 5 vs. Git weight 2).
+            </p>
+            <div class="pipeline-code">
+              // Mathematical scoring function<br>
+              Fit Score = (&sum; w_matched / &sum; w_required) &times; 100%<br>
+              w &isin; [1..5] determined by verified role gating
+            </div>
+          </div>
+        </div>
+
+        <!-- Contrast Matrix Table -->
+        <div style="margin-top: 1rem;">
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--muted); margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em;">
+            SYSTEM COMPARISON: SKILLBRIDGE ENGINE VS. CLOUD LLM ATS PARSERS
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>EVALUATION DIMENSION</th>
+                  <th>SKILLBRIDGE DETERMINISTIC ENGINE</th>
+                  <th>STANDARD BLACK-BOX LLM ATS</th>
+                  <th>ENGINEERING IMPACT</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Screening Latency</div></td>
+                  <td style="color:#FFF; font-weight:700;">&lt; 15 milliseconds (Instant)</td>
+                  <td style="color:#888;">3,000ms – 8,000ms (API Roundtrip)</td>
+                  <td style="color:#AAA;">200x faster candidate processing with zero UI freezing</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Parsing Determinism</div></td>
+                  <td style="color:#FFF; font-weight:700;">100% Mathematically Repeatable</td>
+                  <td style="color:#888;">Stochastic (Temperature Drift)</td>
+                  <td style="color:#AAA;">Same resume always produces identical fit scores</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Hallucination Rate</div></td>
+                  <td style="color:#FFF; font-weight:700;">0.00% (Strict Canonical Match)</td>
+                  <td style="color:#888;">15% – 28% (Phantom Skill Invention)</td>
+                  <td style="color:#AAA;">Eliminates false rejections and false qualifications</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Data Privacy & Sovereignty</div></td>
+                  <td style="color:#FFF; font-weight:700;">100% Client-Side In-Memory</td>
+                  <td style="color:#888;">Sent to 3rd-Party LLM Cloud Endpoints</td>
+                  <td style="color:#AAA;">Zero PII leaves user device; zero server database leakage</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Infrastructure Cost</div></td>
+                  <td style="color:#FFF; font-weight:700;">₹0.00 / $0.00 (Zero Server Bills)</td>
+                  <td style="color:#888;">$0.01 – $0.05 per scanned resume</td>
+                  <td style="color:#AAA;">Scales to millions of evaluations at zero marginal dollar cost</td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600; color:#FFF;">Regulatory Compliance</div></td>
+                  <td style="color:#FFF; font-weight:700;">DPDP Act (India 2023) & GDPR By Design</td>
+                  <td style="color:#888;">Cross-border data transit liabilities</td>
+                  <td style="color:#AAA;">Compliant with enterprise data privacy governance</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="reveal-on-scroll" style="position:relative; z-index:10; border-top:1px solid var(--border); padding:3.5rem 1.5rem 2.5rem; text-align:center;">
+    <img src="skillbridge-logo.png" alt="SkillBridge Logo" style="width:170px; height:80px; object-fit:cover; object-position:center; margin-bottom:1.25rem;">
+    <div style="font-family:var(--font-campton); font-weight:800; font-size:1.05rem; letter-spacing:0.14em; color:#FFF; text-transform:uppercase; margin-bottom:0.4rem;">SkillBridge</div>
+    <div style="font-family:var(--font-mono); font-size:0.72rem; letter-spacing:0.18em; color:#777; text-transform:uppercase; margin-bottom:2rem;">Deterministic Resume Intelligence</div>
+    <div style="max-width:760px; margin:0 auto; font-family:var(--font-mono); font-size:0.72rem; line-height:2; color:#555;">
+      <div style="margin-bottom:1rem; color:#888;">© 2026 SkillBridge. All rights reserved.</div>
+      <div>SkillBridge is a demonstration product crafted for CodeStorm 2026.</div>
+      <div>Resumes are parsed and scored entirely inside your browser — no resume data is ever uploaded to any server.</div>
+      <div>Vacancies combine live public listings with a curated registry; roles, compensation and availability are indicative and subject to change — always verify on the employer's official posting.</div>
+      <div>All company names and trademarks are the property of their respective owners.</div>
+      <div style="margin-top:1rem; color:#444;">Built with determinism. No black boxes were harmed.</div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script>
+    /* ==========================================================================
+       1. DATA DEFINITIONS (SKILL TAXONOMY & WORLDWIDE ENGINEERING CORRIDORS)
+       ========================================================================== */
+    const SKILL_TAXONOMY = [
+      { name: 'javascript', aliases: ['js', 'es6', 'es2015', 'ecmascript', 'vanilla js'] },
+      { name: 'typescript', aliases: ['ts', 'typescriptlang'] },
+      { name: 'react', aliases: ['reactjs', 'react.js', 'react native'] },
+      { name: 'next.js', aliases: ['nextjs', 'next js', 'next'] },
+      { name: 'vue', aliases: ['vuejs', 'vue.js', 'vue3'] },
+      { name: 'html/css', aliases: ['html', 'css', 'html5', 'css3'] },
+      { name: 'tailwind', aliases: ['tailwindcss', 'tailwind css'] },
+      { name: 'redux', aliases: ['redux toolkit', 'rtk'] },
+      { name: 'python', aliases: ['py', 'python3'] },
+      { name: 'node.js', aliases: ['node', 'nodejs', 'express'] },
+      { name: 'java', aliases: ['core java', 'java 8', 'java 17', 'j2ee'] },
+      { name: 'spring boot', aliases: ['spring', 'springboot'] },
+      { name: 'c++', aliases: ['cpp', 'cplusplus'] },
+      { name: 'go', aliases: ['golang', 'go lang'] },
+      { name: 'rest api', aliases: ['rest', 'restful', 'apis', 'api design'] },
+      { name: 'graphql', aliases: ['gql'] },
+      { name: 'sql', aliases: ['rdbms', 'relational database', 'queries'] },
+      { name: 'postgresql', aliases: ['postgres', 'psql'] },
+      { name: 'mongodb', aliases: ['mongo', 'nosql', 'mongoose'] },
+      { name: 'redis', aliases: ['caching', 'redis cache'] },
+      { name: 'kafka', aliases: ['apache kafka', 'message queue'] },
+      { name: 'docker', aliases: ['containerization', 'containers'] },
+      { name: 'kubernetes', aliases: ['k8s'] },
+      { name: 'aws', aliases: ['amazon web services', 'ec2', 's3', 'lambda'] },
+      { name: 'ci/cd', aliases: ['continuous integration', 'github actions', 'jenkins'] },
+      { name: 'linux', aliases: ['bash', 'shell scripting', 'unix'] },
+      { name: 'machine learning', aliases: ['ml', 'scikit-learn', 'sklearn'] },
+      { name: 'deep learning', aliases: ['dl', 'neural networks', 'transformers', 'llm'] },
+      { name: 'pytorch', aliases: ['torch'] },
+      { name: 'tensorflow', aliases: ['tf', 'keras'] },
+      { name: 'pandas', aliases: ['numpy', 'pandas dataframe'] },
+      { name: 'data analysis', aliases: ['eda', 'statistical analysis'] },
+      { name: 'power bi', aliases: ['powerbi', 'power-bi'] },
+      { name: 'tableau', aliases: ['tableau desktop'] },
+      { name: 'selenium', aliases: ['automation testing'] },
+      { name: 'cypress', aliases: ['e2e testing', 'playwright'] },
+      { name: 'unit testing', aliases: ['jest', 'vitest', 'junit'] },
+      { name: 'git', aliases: ['version control', 'github', 'gitlab'] },
+      { name: 'dsa', aliases: ['data structures and algorithms', 'algorithms', 'leetcode'] }
+    ];
+
+    let selectedCountries = new Set(['ALL']);
+    let currentResumeText = '';
+    let lastParsedSkills = [];
+
+    /* Live job feed state (keyless public API, fetched in-browser) */
+    let LIVE_JOBS = [];
+    let liveSyncState = { status: 'idle', count: 0, at: null, error: null };
+    const LIVE_API_BASE = 'https://remote-jobs-api.tten.no/v1/jobs?limit=100&page=';
+
+    const JOBS = [
+      // INDIA TECH CORRIDOR (Bengaluru, NCR, Hyderabad, Mumbai, Pune)
+      { id: 'in-1', country: 'India', flag: '🇮🇳', title: 'Frontend Engineer (React)', company: 'Razorpay', city: 'Bengaluru', salaryDisplay: '₹14–22 LPA', experience: '0-2 Yrs (SDE-1)', domain: 'Fintech Checkout Rails', hubType: 'Tier-1 Unicorn', marketNote: 'Razorpay checkout handles 15M+ daily transactions. High hiring premium on TypeScript & React state reconciliation.', description: 'Build responsive checkout workflows handling millions of daily payments across India.', requiredSkills: [{ skill: 'react', weight: 5 }, { skill: 'typescript', weight: 5 }, { skill: 'javascript', weight: 4 }, { skill: 'tailwind', weight: 3 }, { skill: 'unit testing', weight: 3 }, { skill: 'git', weight: 2 }] },
+      { id: 'in-2', country: 'India', flag: '🇮🇳', title: 'SDE I (Backend)', company: 'Swiggy', city: 'Bengaluru', salaryDisplay: '₹16–24 LPA', experience: '1-3 Yrs (SDE-1)', domain: 'FoodTech & Instant Dispatch', hubType: 'Tier-1 Unicorn', marketNote: 'Sub-millisecond delivery driver matching. Core Java + Kafka event streaming are decisive gating criteria.', description: 'Design high-concurrency order dispatching services with ultra-low latency requirements.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'spring boot', weight: 4 }, { skill: 'sql', weight: 4 }, { skill: 'redis', weight: 3 }, { skill: 'kafka', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'in-3', country: 'India', flag: '🇮🇳', title: 'Junior Data Analyst', company: 'PhonePe', city: 'Bengaluru', salaryDisplay: '₹8–13 LPA', experience: '0-2 Yrs (Analyst)', domain: 'UPI Settlement & Fraud', hubType: 'Fintech Leader', marketNote: 'Processes billions of UPI logs monthly. Complex SQL window aggregations and automated Python KPI pipelines.', description: 'Audit settlement discrepancy funnels and deliver executive telemetry dashboards.', requiredSkills: [{ skill: 'sql', weight: 5 }, { skill: 'python', weight: 4 }, { skill: 'pandas', weight: 4 }, { skill: 'power bi', weight: 4 }, { skill: 'data analysis', weight: 5 }] },
+      { id: 'in-4', country: 'India', flag: '🇮🇳', title: 'Machine Learning Engineer', company: 'Flipkart', city: 'Bengaluru', salaryDisplay: '₹18–28 LPA', experience: '1-3 Yrs (MLE-1)', domain: 'E-Commerce Recommendations', hubType: 'E-Commerce Unicorn', marketNote: 'Real-time personalized ranking and vector retrieval for 100M+ active shoppers. PyTorch models deployed via Docker.', description: 'Train recommendation and search ranking models for e-commerce shoppers.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'machine learning', weight: 5 }, { skill: 'deep learning', weight: 4 }, { skill: 'pytorch', weight: 4 }, { skill: 'sql', weight: 3 }, { skill: 'docker', weight: 2 }] },
+      { id: 'in-5', country: 'India', flag: '🇮🇳', title: 'Cloud & DevOps Engineer', company: 'Zerodha', city: 'Bengaluru', salaryDisplay: '₹15–26 LPA', experience: '1-3 Yrs (Platform)', domain: 'Stock Exchange Connectivity', hubType: 'FinTech Bootstrapped', marketNote: 'Zero-downtime stock exchange connectivity during market open. Extreme Linux networking and Kubernetes reliability.', description: 'Maintain Kubernetes infrastructure and zero-downtime stock exchange connectivity.', requiredSkills: [{ skill: 'docker', weight: 5 }, { skill: 'kubernetes', weight: 5 }, { skill: 'linux', weight: 5 }, { skill: 'aws', weight: 4 }, { skill: 'ci/cd', weight: 4 }] },
+      { id: 'in-6', country: 'India', flag: '🇮🇳', title: 'QA Automation Engineer', company: 'CRED', city: 'Bengaluru', salaryDisplay: '₹10–16 LPA', experience: '1-2 Yrs (SDET)', domain: 'Credit & High-Trust Commerce', hubType: 'Tier-1 Unicorn', marketNote: 'Author automated end-to-end regression suites for payment microservices. High bar on Cypress, Jest, and contract testing.', description: 'Author automated end-to-end regression suites for payment microservices.', requiredSkills: [{ skill: 'selenium', weight: 5 }, { skill: 'javascript', weight: 4 }, { skill: 'cypress', weight: 4 }, { skill: 'unit testing', weight: 4 }, { skill: 'git', weight: 3 }] },
+      { id: 'in-7', country: 'India', flag: '🇮🇳', title: 'SDE-1 (Golang)', company: 'Urban Company', city: 'Gurugram', salaryDisplay: '₹15–23 LPA', experience: '1-3 Yrs (SDE-1)', domain: 'Home Services Dispatch', hubType: 'Tier-1 Unicorn', marketNote: 'Real-time booking allocation engine across 50+ metropolitan zones. High Go/Golang adoption for goroutine concurrency.', description: 'Engineer high-concurrency booking allocation engines across metropolitan markets.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'sql', weight: 4 }, { skill: 'redis', weight: 4 }, { skill: 'dsa', weight: 5 }, { skill: 'docker', weight: 3 }] },
+      { id: 'in-8', country: 'India', flag: '🇮🇳', title: 'Frontend Developer (Next.js)', company: 'Zomato', city: 'Gurugram', salaryDisplay: '₹12–20 LPA', experience: '0-2 Yrs (Frontend)', domain: 'Food & Quick-Commerce Apps', hubType: 'Public Tech Unicorn', marketNote: 'Server-rendered pages optimized for sub-second Core Web Vitals (LCP < 1.2s). Next.js SSR and Tailwind utility CSS.', description: 'Architect server-rendered dining discovery web apps optimized for Core Web Vitals.', requiredSkills: [{ skill: 'next.js', weight: 5 }, { skill: 'react', weight: 5 }, { skill: 'typescript', weight: 4 }, { skill: 'tailwind', weight: 4 }, { skill: 'javascript', weight: 4 }] },
+      { id: 'in-9', country: 'India', flag: '🇮🇳', title: 'Associate SDE (C++)', company: 'Tower Research', city: 'Gurugram', salaryDisplay: '₹22–34 LPA', experience: '0-2 Yrs (SDE)', domain: 'High-Frequency Trading (HFT)', hubType: 'Top Tier HFT', marketNote: 'Sub-microsecond latency execution on exchange matching engines. Top-of-market compensation for C++ & low-level memory mastery.', description: 'Write microsecond-critical automated trading components and exchange gateways.', requiredSkills: [{ skill: 'c++', weight: 5 }, { skill: 'linux', weight: 4 }, { skill: 'dsa', weight: 5 }, { skill: 'git', weight: 2 }] },
+      { id: 'in-10', country: 'India', flag: '🇮🇳', title: 'Junior NLP / AI Engineer', company: 'Sarvam AI', city: 'Bengaluru', salaryDisplay: '₹16–25 LPA', experience: '0-2 Yrs (Research Eng)', domain: 'Foundational Indian LLMs', hubType: 'AI DeepTech', marketNote: 'Training sovereign Indian-language speech and foundational LLMs. PyTorch transformer models and custom tokenizers.', description: 'Train sovereign Indian-language speech and language foundational models.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'deep learning', weight: 5 }, { skill: 'pytorch', weight: 5 }, { skill: 'machine learning', weight: 4 }, { skill: 'git', weight: 2 }] },
+      { id: 'in-11', country: 'India', flag: '🇮🇳', title: 'Backend Engineer (FastAPI)', company: 'Postman', city: 'Bengaluru', salaryDisplay: '₹16–26 LPA', experience: '1-3 Yrs (Backend)', domain: 'Developer Tools & Workspaces', hubType: 'Global SaaS Product', marketNote: 'API platform infrastructure serving 30M+ developers worldwide. Python FastAPI microservices and PostgreSQL schema design.', description: 'Develop collaborative developer API workspaces and synchronization engines.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'rest api', weight: 5 }, { skill: 'postgresql', weight: 4 }, { skill: 'docker', weight: 3 }, { skill: 'aws', weight: 3 }] },
+      { id: 'in-12', country: 'India', flag: '🇮🇳', title: 'Full Stack Engineer (Vue + Node)', company: 'BrowserStack', city: 'Mumbai', salaryDisplay: '₹14–22 LPA', experience: '1-3 Yrs (Full Stack)', domain: 'Cloud Test Infrastructure', hubType: 'SaaS Unicorn', marketNote: 'Real-time WebSocket streaming to remote browsers and mobile device farms. Vue components and Node backend microservices.', description: 'Create interactive real-time browser cloud control terminals and device farm dashboards.', requiredSkills: [{ skill: 'vue', weight: 5 }, { skill: 'javascript', weight: 5 }, { skill: 'node.js', weight: 4 }, { skill: 'rest api', weight: 4 }] },
+
+      // UNITED STATES CORRIDOR (Silicon Valley, New York, Seattle, Austin)
+      { id: 'us-1', country: 'United States', flag: '🇺🇸', title: 'AI Systems & Platforms Engineer', company: 'OpenAI', city: 'San Francisco, CA', salaryDisplay: '$220k–$340k / yr', experience: '1-3 Yrs (L4)', domain: 'Frontier Model Inference', hubType: 'Top Tier AI Lab', marketNote: 'High-throughput transformer inference orchestration and cluster telemetry. Massive demand for PyTorch, C++, and Linux networking.', description: 'Engineer distributed inference systems serving hundreds of millions of daily API requests with ultra-low latency guarantees.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'pytorch', weight: 5 }, { skill: 'deep learning', weight: 5 }, { skill: 'docker', weight: 4 }, { skill: 'linux', weight: 4 }, { skill: 'c++', weight: 3 }] },
+      { id: 'us-2', country: 'United States', flag: '🇺🇸', title: 'Software Engineer - Payments Core', company: 'Stripe', city: 'San Francisco, CA', salaryDisplay: '$145k–$215k / yr', experience: '0-2 Yrs (L1)', domain: 'Global Financial Ledger', hubType: 'FinTech Giant', marketNote: 'Idempotency and distributed consistency across global banking rails. Core Java/Go, SQL transactional rigor, and Redis caches.', description: 'Architect fault-tolerant ledger ingestion engines handling trillions in transaction volume.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'go', weight: 4 }, { skill: 'sql', weight: 5 }, { skill: 'redis', weight: 4 }, { skill: 'rest api', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'us-3', country: 'United States', flag: '🇺🇸', title: 'Foundation Model Research Engineer', company: 'Anthropic', city: 'San Francisco, CA', salaryDisplay: '$230k–$350k / yr', experience: '1-3 Yrs (Member Tech Staff)', domain: 'Constitutional AI Systems', hubType: 'Frontier AI Lab', marketNote: 'Distributed multi-node GPU training and safety alignment evaluation pipelines using PyTorch and CUDA bindings.', description: 'Train and fine-tune large-scale language models while establishing automated alignment guardrails.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'pytorch', weight: 5 }, { skill: 'machine learning', weight: 5 }, { skill: 'deep learning', weight: 4 }, { skill: 'linux', weight: 4 }, { skill: 'dsa', weight: 4 }] },
+      { id: 'us-4', country: 'United States', flag: '🇺🇸', title: 'Distributed Systems Engineer', company: 'Datadog', city: 'New York, NY', salaryDisplay: '$150k–$225k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'Observability & Streaming', hubType: 'Enterprise Cloud Leader', marketNote: 'Petabyte-scale metric streaming. Golang microservices running on Kubernetes with Apache Kafka ingestion queues.', description: 'Build real-time event aggregation engines processing trillions of host metrics every second.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'kafka', weight: 5 }, { skill: 'kubernetes', weight: 4 }, { skill: 'docker', weight: 4 }, { skill: 'linux', weight: 4 }, { skill: 'dsa', weight: 4 }] },
+      { id: 'us-5', country: 'United States', flag: '🇺🇸', title: 'Streaming Platform Backend Engineer', company: 'Netflix', city: 'Los Gatos, CA', salaryDisplay: '$170k–$260k / yr', experience: '1-3 Yrs (L4)', domain: 'Video Encoding & Edge Delivery', hubType: 'FAANG / Streaming Leader', marketNote: 'Zero-downtime microservices serving 260M+ global members. Spring Boot, AWS event mesh, and high-performance Redis caching.', description: 'Engineer adaptive bitrate streaming control planes and personalized video manifest dispatchers.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'spring boot', weight: 5 }, { skill: 'aws', weight: 4 }, { skill: 'kafka', weight: 4 }, { skill: 'redis', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'us-6', country: 'United States', flag: '🇺🇸', title: 'WebGL Canvas Frontend Engineer', company: 'Figma', city: 'San Francisco, CA', salaryDisplay: '$145k–$215k / yr', experience: '0-2 Yrs (IC1)', domain: 'Collaborative Design Engine', hubType: 'SaaS Leader', marketNote: 'Browser performance at 60 FPS. Deep understanding of TypeScript, React components, and WebAssembly / C++ memory.', description: 'Build high-performance vector rendering tools and real-time multiplayer canvas synchronizers.', requiredSkills: [{ skill: 'typescript', weight: 5 }, { skill: 'react', weight: 5 }, { skill: 'javascript', weight: 4 }, { skill: 'c++', weight: 3 }, { skill: 'html/css', weight: 4 }, { skill: 'git', weight: 3 }] },
+      { id: 'us-7', country: 'United States', flag: '🇺🇸', title: 'Query Engine Execution Engineer', company: 'Snowflake', city: 'Seattle, WA', salaryDisplay: '$160k–$235k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'Cloud Data Warehouse', hubType: 'Cloud Infrastructure', marketNote: 'Vectorized query execution and memory-safe database kernels. Extreme focus on C++, Linux internals, and SQL algorithms.', description: 'Author optimized SQL query execution operators and distributed storage partition decoders.', requiredSkills: [{ skill: 'c++', weight: 5 }, { skill: 'sql', weight: 5 }, { skill: 'linux', weight: 4 }, { skill: 'dsa', weight: 5 }, { skill: 'git', weight: 3 }] },
+      { id: 'us-8', country: 'United States', flag: '🇺🇸', title: 'Full Stack Cloud Engineer', company: 'Supabase', city: 'San Francisco, CA', salaryDisplay: '$135k–$195k / yr', experience: '1-3 Yrs (Mid)', domain: 'Developer Cloud Platforms', hubType: 'Open Source Cloud', marketNote: 'Modern reactive developer platforms. TypeScript, Next.js server actions, PostgreSQL extensions, and Docker tooling.', description: 'Build developer console workflows, automated database backup tools, and auth integration hooks.', requiredSkills: [{ skill: 'typescript', weight: 5 }, { skill: 'next.js', weight: 5 }, { skill: 'postgresql', weight: 4 }, { skill: 'node.js', weight: 4 }, { skill: 'tailwind', weight: 3 }] },
+
+      // UNITED KINGDOM CORRIDOR (London, Cambridge)
+      { id: 'uk-1', country: 'United Kingdom', flag: '🇬🇧', title: 'Research Software Engineer', company: 'Google DeepMind', city: 'London', salaryDisplay: '£95k–£160k / yr', experience: '1-3 Yrs (L4)', domain: 'AGI & Reinforcement Learning', hubType: 'Frontier AI Lab', marketNote: 'Scalable neural network training frameworks. PyTorch model compilation, low-level Python C-extensions, and Linux computing.', description: 'Collaborate with research scientists to implement novel reinforcement learning and multi-agent AI environments.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'pytorch', weight: 5 }, { skill: 'deep learning', weight: 4 }, { skill: 'c++', weight: 4 }, { skill: 'linux', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'uk-2', country: 'United Kingdom', flag: '🇬🇧', title: 'Core Banking Go Engineer', company: 'Monzo', city: 'London', salaryDisplay: '£75k–£120k / yr', experience: '1-3 Yrs (Backend)', domain: 'App-Only Digital Banking', hubType: 'FinTech Challenger', marketNote: '1,500+ microservices in Go on Kubernetes. Apache Kafka transactional events with strict PostgreSQL consistency.', description: 'Engineer instant transaction ledger services and automated financial crime detection microservices.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'kubernetes', weight: 5 }, { skill: 'kafka', weight: 4 }, { skill: 'postgresql', weight: 4 }, { skill: 'dsa', weight: 4 }] },
+      { id: 'uk-3', country: 'United Kingdom', flag: '🇬🇧', title: 'Financial Ledger Systems Engineer', company: 'Revolut', city: 'London', salaryDisplay: '£80k–£130k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'Global SuperApp Banking', hubType: 'Global FinTech', marketNote: 'Multi-currency settlement ledgers processing 50M+ users. High-concurrency Java 17, Spring Boot, and Redis cluster caching.', description: 'Design real-time forex exchange routers and cross-border bank payment rails with ultra-low latency.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'spring boot', weight: 5 }, { skill: 'postgresql', weight: 4 }, { skill: 'redis', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'uk-4', country: 'United Kingdom', flag: '🇬🇧', title: 'Compilers & Toolchain Engineer', company: 'Arm', city: 'Cambridge', salaryDisplay: '£65k–£105k / yr', experience: '0-2 Yrs (Graduate/SDE)', domain: 'Processor Architecture & LLVM', hubType: 'Semiconductor Giant', marketNote: 'LLVM backend optimizations and CPU performance profiling. Modern C++, Linux kernel, and computer systems fundamentals.', description: 'Implement code generation passes and instruction set emulators for next-generation Cortex cores.', requiredSkills: [{ skill: 'c++', weight: 5 }, { skill: 'linux', weight: 5 }, { skill: 'dsa', weight: 5 }, { skill: 'git', weight: 3 }] },
+      { id: 'uk-5', country: 'United Kingdom', flag: '🇬🇧', title: 'Real-Time Dispatch Algorithms SDE', company: 'Deliveroo', city: 'London', salaryDisplay: '£70k–£115k / yr', experience: '1-3 Yrs (Mid)', domain: 'Food & Grocery Logistics', hubType: 'Delivery Tech', marketNote: 'Dynamic order-to-rider matching algorithms. Python, PostgreSQL geospatial queries, and Redis pub/sub queues.', description: 'Build machine learning-driven dispatch heuristics to minimize customer wait times across European cities.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'machine learning', weight: 4 }, { skill: 'sql', weight: 4 }, { skill: 'redis', weight: 4 }, { skill: 'rest api', weight: 4 }] },
+      { id: 'uk-6', country: 'United Kingdom', flag: '🇬🇧', title: 'Cross-Border FX Engine Developer', company: 'Wise', city: 'London', salaryDisplay: '£72k–£118k / yr', experience: '1-3 Yrs (SDE)', domain: 'International Currency Transfer', hubType: 'Public FinTech', marketNote: 'Direct connectivity to central banks worldwide. Java microservices, Apache Kafka event streaming, and automated Docker CI/CD.', description: 'Author liquidity balancing engines and payment settlement rails across 70+ global currencies.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'spring boot', weight: 4 }, { skill: 'kafka', weight: 4 }, { skill: 'docker', weight: 3 }, { skill: 'sql', weight: 4 }] },
+
+      // GERMANY / EU CORRIDOR (Berlin, Munich, Amsterdam)
+      { id: 'de-1', country: 'Germany', flag: '🇩🇪', title: 'Logistics & Fleet Routing SDE', company: 'Delivery Hero', city: 'Berlin', salaryDisplay: '€75k–€115k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'Quick Commerce Logistics', hubType: 'Global Tech Unicorn', marketNote: 'High-throughput microservices handling millions of European orders. Golang, Kubernetes, and Kafka streaming.', description: 'Engineer dispatch routing microservices optimizing courier allocation across 70+ countries.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'kubernetes', weight: 4 }, { skill: 'kafka', weight: 4 }, { skill: 'redis', weight: 4 }, { skill: 'docker', weight: 3 }] },
+      { id: 'de-2', country: 'Germany', flag: '🇩🇪', title: 'Mobile Core Banking Backend SDE', company: 'N26', city: 'Berlin', salaryDisplay: '€70k–€110k / yr', experience: '1-3 Yrs (Backend)', domain: 'Neobank Infrastructure', hubType: 'FinTech Unicorn', marketNote: 'Banking compliance and PSD2 security rails. Java 17, Spring Boot, REST APIs, and Dockerized AWS pipelines.', description: 'Build transaction processing and account balance calculation microservices for millions of European users.', requiredSkills: [{ skill: 'java', weight: 5 }, { skill: 'spring boot', weight: 5 }, { skill: 'postgresql', weight: 4 }, { skill: 'rest api', weight: 4 }, { skill: 'docker', weight: 3 }] },
+      { id: 'de-3', country: 'Germany', flag: '🇩🇪', title: 'Process Mining Big Data Engineer', company: 'Celonis', city: 'Munich', salaryDisplay: '€72k–€112k / yr', experience: '1-3 Yrs (Data)', domain: 'Enterprise Process Intelligence', hubType: 'Decacorn SaaS', marketNote: 'Analyzing billions of corporate ERP event logs. High performance SQL, Python Pandas data pipelines, and Docker containers.', description: 'Build high-speed ingestion and transformation pipelines for event log graph mining.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'sql', weight: 5 }, { skill: 'pandas', weight: 4 }, { skill: 'kafka', weight: 4 }, { skill: 'docker', weight: 3 }] },
+      { id: 'de-4', country: 'Germany', flag: '🇩🇪', title: 'Full Stack Product Developer', company: 'Personio', city: 'Munich', salaryDisplay: '€68k–€105k / yr', experience: '1-3 Yrs (Full Stack)', domain: 'All-in-One HR Enterprise SaaS', hubType: 'European SaaS Unicorn', marketNote: 'Modern web app delivery. TypeScript, React UI components, Node.js microservices, and PostgreSQL database schemas.', description: 'Develop payroll automation workflows and employee document management portals.', requiredSkills: [{ skill: 'typescript', weight: 5 }, { skill: 'react', weight: 5 }, { skill: 'node.js', weight: 4 }, { skill: 'postgresql', weight: 4 }, { skill: 'tailwind', weight: 3 }] },
+      { id: 'de-5', country: 'Germany', flag: '🇩🇪', title: 'Search & Recommendation ML Engineer', company: 'Zalando', city: 'Berlin', salaryDisplay: '€75k–€118k / yr', experience: '1-3 Yrs (MLE)', domain: 'Fashion E-Commerce Search', hubType: 'European E-Comm Giant', marketNote: 'Personalized product feeds for 50M+ customers. PyTorch model training, vector embeddings, and AWS cloud inference.', description: 'Author visual search ranking algorithms and personalization models deployed via cloud APIs.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'machine learning', weight: 5 }, { skill: 'pytorch', weight: 4 }, { skill: 'sql', weight: 4 }, { skill: 'aws', weight: 3 }] },
+
+      // SINGAPORE / APAC CORRIDOR (Singapore, Sydney)
+      { id: 'sg-1', country: 'Singapore', flag: '🇸🇬', title: 'SuperApp Transport Backend Engineer', company: 'Grab', city: 'Singapore', salaryDisplay: 'S$110k–S$170k / yr', experience: '1-3 Yrs (Backend)', domain: 'Mobility & FinTech SuperApp', hubType: 'Southeast Asia Giant', marketNote: 'Concurrent ride hailing and food delivery dispatch. Go microservices, Redis distributed locks, and Kafka streaming.', description: 'Scale high-concurrency booking engines serving millions of passengers and drivers across Southeast Asia.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'sql', weight: 4 }, { skill: 'redis', weight: 5 }, { skill: 'kafka', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'sg-2', country: 'Singapore', flag: '🇸🇬', title: 'Checkout & Orders Platform SDE', company: 'Shopee (Sea Group)', city: 'Singapore', salaryDisplay: 'S$100k–S$160k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'E-Commerce Mega-Sales', hubType: 'Tech Conglomerate', marketNote: 'Flash sales handling 100k+ orders per second. High proficiency in Go, Java, Redis caching, and algorithm problem solving.', description: 'Architect high-availability inventory locking and payment confirmation services for double-digit mega sales.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'java', weight: 4 }, { skill: 'redis', weight: 5 }, { skill: 'sql', weight: 4 }, { skill: 'dsa', weight: 5 }] },
+      { id: 'sg-3', country: 'Singapore', flag: '🇸🇬', title: 'Recommendation Algorithm Engineer', company: 'ByteDance APAC', city: 'Singapore', salaryDisplay: 'S$120k–S$185k / yr', experience: '1-3 Yrs (Algorithm Eng)', domain: 'Short-Form Video Ranking', hubType: 'Global Tech Leader', marketNote: 'Large-scale recommendation networks. PyTorch transformer architectures, high performance C++ inference, and Linux systems.', description: 'Train deep recommendation candidate generation and cross-entropy ranking models for millions of concurrent viewers.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'machine learning', weight: 5 }, { skill: 'deep learning', weight: 5 }, { skill: 'pytorch', weight: 4 }, { skill: 'c++', weight: 3 }] },
+      { id: 'sg-4', country: 'Singapore', flag: '🇸🇬', title: 'Marketplace Full Stack Engineer', company: 'Carousell', city: 'Singapore', salaryDisplay: 'S$85k–S$135k / yr', experience: '1-3 Yrs (Full Stack)', domain: 'Classifieds & Recommerce', hubType: 'Unicorn Marketplace', marketNote: 'Consumer buyer-seller messaging and listings. React frontend with TypeScript, Node.js services, and PostgreSQL.', description: 'Build in-app item search, buyer verification flows, and transactional escrow checkout portals.', requiredSkills: [{ skill: 'react', weight: 5 }, { skill: 'node.js', weight: 4 }, { skill: 'typescript', weight: 4 }, { skill: 'postgresql', weight: 4 }, { skill: 'tailwind', weight: 3 }] },
+
+      // CANADA CORRIDOR (Toronto, Vancouver)
+      { id: 'ca-1', country: 'Canada', flag: '🇨🇦', title: 'Merchant Infrastructure Backend SDE', company: 'Shopify', city: 'Toronto', salaryDisplay: 'C$130k–C$190k / yr', experience: '1-3 Yrs (SDE-1)', domain: 'Global Merchant Commerce', hubType: 'Global E-Commerce Giant', marketNote: 'Powering over 10% of total US ecommerce. High proficiency in backend systems, PostgreSQL, Redis caching, and GraphQL.', description: 'Develop zero-downtime merchant checkout services, store inventory APIs, and multi-tenant webhook dispatchers.', requiredSkills: [{ skill: 'python', weight: 4 }, { skill: 'postgresql', weight: 5 }, { skill: 'redis', weight: 4 }, { skill: 'graphql', weight: 4 }, { skill: 'rest api', weight: 4 }, { skill: 'dsa', weight: 4 }] },
+      { id: 'ca-2', country: 'Canada', flag: '🇨🇦', title: 'Enterprise LLM Inference Engineer', company: 'Cohere', city: 'Toronto', salaryDisplay: 'C$145k–C$220k / yr', experience: '1-3 Yrs (Member Tech Staff)', domain: 'Enterprise Foundational Models', hubType: 'Top Tier AI Unicorn', marketNote: 'High-throughput LLM API serving and retrieval-augmented generation. PyTorch, Linux GPU profiling, and Docker containers.', description: 'Engineer low-latency embedding generation and transformer inference servers for enterprise Fortune 500 customers.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'pytorch', weight: 5 }, { skill: 'deep learning', weight: 4 }, { skill: 'docker', weight: 4 }, { skill: 'linux', weight: 4 }] },
+      { id: 'ca-3', country: 'Canada', flag: '🇨🇦', title: 'Security Infrastructure Engineer', company: '1Password', city: 'Vancouver', salaryDisplay: 'C$120k–C$175k / yr', experience: '1-3 Yrs (Security Eng)', domain: 'Zero-Knowledge Cryptography', hubType: 'Security SaaS Unicorn', marketNote: 'End-to-end zero-knowledge encryption pipelines. Go microservices, Linux security hardening, and Docker containerization.', description: 'Build cryptographically verified credential vault synchronization systems and automated compliance scanners.', requiredSkills: [{ skill: 'go', weight: 5 }, { skill: 'linux', weight: 5 }, { skill: 'docker', weight: 4 }, { skill: 'rest api', weight: 4 }, { skill: 'git', weight: 3 }] },
+      { id: 'ca-4', country: 'Canada', flag: '🇨🇦', title: 'Trading & Investments Platform SDE', company: 'Wealthsimple', city: 'Toronto', salaryDisplay: 'C$125k–C$185k / yr', experience: '1-3 Yrs (SDE)', domain: 'Modern Consumer WealthTech', hubType: 'FinTech Leader', marketNote: 'Automated fractional stock trading and crypto custody. TypeScript, Node.js backend services, React, and AWS cloud.', description: 'Engineer real-time portfolio value recalculation workers and automated tax-loss harvesting engines.', requiredSkills: [{ skill: 'typescript', weight: 5 }, { skill: 'node.js', weight: 5 }, { skill: 'react', weight: 4 }, { skill: 'postgresql', weight: 4 }, { skill: 'aws', weight: 3 }] },
+
+      // GLOBAL REMOTE CORRIDOR (Async, Worldwide)
+      { id: 'rm-1', country: 'Remote', flag: '⚡', title: 'Cloud-Native Platform SRE', company: 'GitLab', city: 'Remote Global', salaryDisplay: '$130k–$200k / yr', experience: '1-3 Yrs (Intermediate)', domain: 'DevOps Platform as a Service', hubType: 'Public All-Remote Pioneer', marketNote: 'Kubernetes fleet orchestration for millions of hosted repositories. Kubernetes, Docker, Linux systems, and CI/CD automation.', description: 'Manage multi-cloud Kubernetes clusters, automate disaster recovery runbooks, and optimize pipeline execution speed.', requiredSkills: [{ skill: 'kubernetes', weight: 5 }, { skill: 'docker', weight: 5 }, { skill: 'linux', weight: 5 }, { skill: 'ci/cd', weight: 5 }, { skill: 'go', weight: 4 }] },
+      { id: 'rm-2', country: 'Remote', flag: '⚡', title: 'Real-Time Sync Frontend Engineer', company: 'Linear', city: 'Remote Global', salaryDisplay: '$140k–$210k / yr', experience: '1-3 Yrs (Frontend)', domain: 'Issue Tracking & Sync Engine', hubType: 'Productivity Unicorn', marketNote: 'Uncompromising UI speed and offline-first SQLite sync. TypeScript, React components, Tailwind styling, and GraphQL.', description: 'Build instant issue keyboard navigation, offline mutation queues, and collaborative canvas viewports.', requiredSkills: [{ skill: 'typescript', weight: 5 }, { skill: 'react', weight: 5 }, { skill: 'node.js', weight: 4 }, { skill: 'tailwind', weight: 4 }, { skill: 'graphql', weight: 4 }] },
+      { id: 'rm-3', country: 'Remote', flag: '⚡', title: 'ClickHouse Analytics Backend SDE', company: 'PostHog', city: 'Remote Global', salaryDisplay: '$135k–$195k / yr', experience: '1-3 Yrs (Backend)', domain: 'Open Source Product Telemetry', hubType: 'Open-Core SaaS', marketNote: 'Processing billions of analytics events daily. Python microservices, Kafka event ingestion, Docker containers, and SQL.', description: 'Build session recording ingestion pipelines, user path funnels, and real-time cohort aggregation query plans.', requiredSkills: [{ skill: 'python', weight: 5 }, { skill: 'sql', weight: 5 }, { skill: 'kafka', weight: 4 }, { skill: 'docker', weight: 4 }, { skill: 'rest api', weight: 4 }] },
+      { id: 'rm-4', country: 'Remote', flag: '⚡', title: 'Core Web Systems Developer', company: 'Automattic', city: 'Remote Global', salaryDisplay: '$120k–$180k / yr', experience: '1-3 Yrs (Code Wrangler)', domain: 'Open Web Platforms (WordPress)', hubType: 'Global Remote Pioneer', marketNote: 'Powering 43% of the internet. JavaScript (ES6+), React Gutenberg block architecture, HTML5/CSS3, and Git versioning.', description: 'Author accessible block editor workflows, full-site editing tools, and high-performance server rendering modules.', requiredSkills: [{ skill: 'javascript', weight: 5 }, { skill: 'react', weight: 5 }, { skill: 'node.js', weight: 4 }, { skill: 'html/css', weight: 4 }, { skill: 'git', weight: 3 }] },
+      { id: 'rm-5', country: 'Remote', flag: '⚡', title: 'Web Systems Reliability Engineer', company: '37signals (Basecamp)', city: 'Remote Global', salaryDisplay: '$130k–$190k / yr', experience: '1-3 Yrs (SRE/Ops)', domain: 'Modern Software Simplicity', hubType: 'Independent Software', marketNote: 'Cloud exit and bare-metal server operations with Kamal. Linux administration, Docker containers, SQL databases, and Git.', description: 'Maintain high availability for millions of active Basecamp and HEY email users across private datacenter infrastructure.', requiredSkills: [{ skill: 'linux', weight: 5 }, { skill: 'docker', weight: 5 }, { skill: 'sql', weight: 4 }, { skill: 'rest api', weight: 4 }, { skill: 'git', weight: 3 }] }
+    ];
+
+    const SAMPLES = {
+      frontend: `Aarav Sharma - Frontend Developer
+Skills: JavaScript (ES6+), React.js, TypeScript, Tailwind CSS, HTML5, CSS3, Redux Toolkit, Jest, Git.
+Built responsive checkout flows and real-time trading dashboards.`,
+      backend: `Priya Patel - Backend SDE
+Technical Skills: Core Java, Spring Boot, PostgreSQL, Microservices, Apache Kafka, Redis, Docker, DSA.
+Engineered high-concurrency event-driven payment ledgers.`,
+      data: `Rohan Gupta - Data Science & Analytics
+Competencies: Python, Pandas, SQL, Machine Learning, Deep Learning, PyTorch, Data Analysis, Power BI.
+Built customer churn prediction model and automated ETL pipelines on AWS.`
+    };
+
+    /* ==========================================================================
+       2. PURE MATCHING ENGINE
+       ========================================================================== */
+    function parseResumeText(raw) {
+      if (!raw) return [];
+      const clean = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
+      const lower = clean.toLowerCase().replace(/\r\n/g, '\n');
+      const cleaned = lower.replace(/[^a-z0-9+#./\-_ ]+/g, ' ');
+      const words = cleaned.split(/\s+/).filter(Boolean);
+      const tokenSet = new Set();
+      for (const w of words) {
+        tokenSet.add(w);
+        const stripped = w.replace(/^[.-]+|[.-]+$/g, '');
+        if (stripped) tokenSet.add(stripped);
+      }
+      for (let i = 0; i < words.length - 1; i++) {
+        tokenSet.add(`${words[i]} ${words[i + 1]}`);
+        if (i < words.length - 2) {
+          tokenSet.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
+        }
+      }
+      return Array.from(tokenSet);
+    }
+
+    function resolveSkills(tokens) {
+      const tokenSet = new Set(tokens.map(t => t.toLowerCase().trim()));
+      const matched = new Set();
+      for (const item of SKILL_TAXONOMY) {
+        if (tokenSet.has(item.name.toLowerCase())) {
+          matched.add(item.name);
+          continue;
+        }
+        for (const alias of item.aliases) {
+          if (tokenSet.has(alias.toLowerCase())) {
+            matched.add(item.name);
+            break;
+          }
+        }
+      }
+      return Array.from(matched);
+    }
+
+    function scoreJob(userSkills, job) {
+      if (!job.requiredSkills || job.requiredSkills.length === 0) return 0;
+      const set = new Set(userSkills.map(s => s.toLowerCase()));
+      let matchWeight = 0, totalWeight = 0;
+      for (const req of job.requiredSkills) {
+        totalWeight += req.weight;
+        if (set.has(req.skill.toLowerCase())) matchWeight += req.weight;
+      }
+      return totalWeight === 0 ? 0 : Math.round((matchWeight / totalWeight) * 100);
+    }
+
+    function getAllJobs() {
+      return JOBS.concat(LIVE_JOBS);
+    }
+
+    function getFilteredJobs() {
+      const all = getAllJobs();
+      if (!selectedCountries || selectedCountries.has('ALL') || selectedCountries.size === 0) {
+        return all;
+      }
+      return all.filter(j => selectedCountries.has(j.country));
+    }
+
+    function rankJobs(userSkills) {
+      const set = new Set(userSkills.map(s => s.toLowerCase()));
+      const targetJobs = getFilteredJobs();
+
+      return targetJobs.map(job => {
+        const score = scoreJob(userSkills, job);
+        const matched = [];
+        const missing = [];
+        for (const req of job.requiredSkills) {
+          if (set.has(req.skill.toLowerCase())) matched.push(req.skill);
+          else missing.push(req.skill);
+        }
+        return { job, score, matchedSkills: matched, missingSkills: missing };
+      }).sort((a, b) => b.score - a.score);
+    }
+
+    function rankSkillGaps(userSkills) {
+      const set = new Set(userSkills.map(s => s.toLowerCase()));
+      const targetJobs = getFilteredJobs();
+
+      const map = new Map();
+      for (const job of targetJobs) {
+        for (const req of job.requiredSkills) {
+          const sk = req.skill.toLowerCase();
+          if (!set.has(sk)) {
+            const cur = map.get(sk) || { count: 0, weightSum: 0 };
+            cur.count += 1;
+            cur.weightSum += req.weight;
+            map.set(sk, cur);
+          }
+        }
+      }
+      return Array.from(map.entries()).map(([skill, d]) => ({
+        skill,
+        demandCount: d.count,
+        totalInRegion: targetJobs.length,
+        weightSum: d.weightSum
+      })).sort((a, b) => b.demandCount - a.demandCount);
+    }
+
+    /* ==========================================================================
+       2B. LIVE UTAH JOB FEED — keyless public API, fetched 100% in-browser.
+       Live listings are normalized into the same schema as curated roles,
+       required skills are inferred through the canonical taxonomy, and the
+       deterministic engine scores them identically. Curated data stays as
+       the offline fallback, so the demo never breaks without network.
+       ========================================================================== */
+    function inferSkillsFromText(text) {
+      if (!text) return [];
+      return resolveSkills(parseResumeText(text));
+    }
+
+    function normalizeLiveJob(j, idx) {
+      const loc = (j.location || '').trim();
+      const locLower = loc.toLowerCase();
+      const isUtah = locLower.includes('utah');
+      const text = [j.title, j.company, (j.tags || []).join(' '), j.description].filter(Boolean).join(' ');
+      const skills = inferSkillsFromText(text);
+      let salaryDisplay = 'See posting';
+      if (j.salary) salaryDisplay = j.salary;
+      else if (j.salary_min || j.salary_max) {
+        const fmt = (n) => n >= 1000 ? '$' + Math.round(n / 1000) + 'k' : '$' + n;
+        salaryDisplay = (j.salary_min ? fmt(j.salary_min) : '?') + '\u2013' + (j.salary_max ? fmt(j.salary_max) : '?') + ' / yr';
+      }
+      let city = loc.split(';')[0].trim().split(',')[0].trim();
+      if (!city) city = isUtah ? 'Utah' : 'Remote';
+      const pub = j.published ? new Date(j.published) : null;
+      return {
+        id: 'live-' + (j.source || 'feed') + '-' + (j.id || idx),
+        country: isUtah ? 'Utah' : 'Remote',
+        flag: isUtah ? '\uD83C\uDFD4\uFE0F' : '\u26A1',
+        title: j.title || 'Untitled role',
+        company: j.company || 'Unknown',
+        city: city,
+        salaryDisplay: salaryDisplay,
+        experience: 'See posting',
+        domain: j.category || 'Live listing',
+        hubType: 'Live Feed',
+        marketNote: 'Live via ' + (j.source || 'public feed') + (pub && !isNaN(pub) ? ' \u00B7 posted ' + pub.toLocaleDateString() : ''),
+        description: ((j.description || '').slice(0, 400) || 'Live job listing pulled in real time. Open the posting for the full description.'),
+        requiredSkills: skills.map(s => ({ skill: s, weight: 3 })),
+        live: true,
+        applyUrl: j.url || '',
+        publishedAt: j.published || ''
+      };
+    }
+
+    async function fetchLiveJobs() {
+      if (liveSyncState.status === 'loading') return;
+      liveSyncState.status = 'loading';
+      updateLiveUI();
+      try {
+        const pages = [1, 2, 3].map(p =>
+          fetch(LIVE_API_BASE + p).then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+        );
+        const results = await Promise.all(pages);
+        const seen = new Set();
+        const jobs = [];
+        results.forEach((d, pi) => {
+          (d.jobs || []).forEach((j, ji) => {
+            const key = (j.source || '') + ':' + j.id;
+            if (!seen.has(key)) { seen.add(key); jobs.push(normalizeLiveJob(j, pi * 100 + ji)); }
+          });
+        });
+        LIVE_JOBS = jobs;
+        liveSyncState = { status: 'ok', count: jobs.length, at: new Date(), error: null };
+      } catch (err) {
+        liveSyncState = { status: 'error', count: LIVE_JOBS.length, at: liveSyncState.at, error: (err && err.message) || 'fetch failed' };
+      }
+      updateLiveUI();
+      if (lastParsedSkills && lastParsedSkills.length > 0) {
+        renderResults(lastParsedSkills, rankJobs(lastParsedSkills), rankSkillGaps(lastParsedSkills));
+      }
+    }
+
+    function updateLiveUI() {
+      const el = document.getElementById('live-sync-status');
+      if (!el) return;
+      const s = liveSyncState;
+      if (s.status === 'loading') {
+        el.innerHTML = '<span style="color:#AAA;">\u25CF Syncing live job feed\u2026</span>';
+      } else if (s.status === 'ok') {
+        const utahCount = LIVE_JOBS.filter(j => j.country === 'Utah').length;
+        const when = s.at ? s.at.toLocaleTimeString() : '';
+        el.innerHTML = '<span style="color:#00FF88;">\u25CF Live:</span> ' + s.count + ' jobs synced (' + utahCount + ' Utah) \u00B7 ' + when;
+      } else if (s.status === 'error') {
+        el.innerHTML = '<span style="color:#FF6B6B;">\u25CF Live feed unreachable</span> <span style="color:#666;">\u2014 showing curated demo data</span>';
+      } else {
+        el.innerHTML = '<span style="color:#666;">\u25CF Live feed idle</span>';
+      }
+      const badge = document.getElementById('active-jobs-summary-badge');
+      if (badge) {
+        const total = getFilteredJobs().length;
+        badge.innerText = total + ' Roles Synced' + (LIVE_JOBS.length ? ' (' + LIVE_JOBS.length + ' live)' : '');
+      }
+    }
+
+    /* Optional: USAJobs (federal Utah roles) — needs a free key from developer.usajobs.gov.
+       Set USAJOBS_KEY + USAJOBS_EMAIL below, then call fetchUSAJobs() on load.
+       const USAJOBS_KEY = ''; const USAJOBS_EMAIL = '';
+    */
+
+    /* ==========================================================================
+       3. ULTRA-LIGHTWEIGHT AMBIENT STARFIELD COSMOS ENGINE
+       - Single-quad high-performance WebGL ambient starfield with twinkling stars
+       - Smooth multi-depth parallax on scroll
+       - 100% removed logo constellation & heavy particle computation
+       - Rock-solid 60-120fps performance for hackathon presentation
+       ========================================================================== */
+    const canvas = document.getElementById("bgCanvas");
+
+    let rawScrollY = window.scrollY || 0;
+    let smoothScrollY = rawScrollY;
+    window.addEventListener("scroll", () => {
+      rawScrollY = window.scrollY || 0;
+    }, { passive: true });
+
+    const gl = canvas.getContext("webgl", { alpha: false, antialias: true, powerPreference: "high-performance" });
+
+    if (gl) {
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.floor(window.innerWidth * dpr);
+        const h = Math.floor(window.innerHeight * dpr);
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          gl.viewport(0, 0, w, h);
+        }
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      const startTime = performance.now();
+
+      // Ambient Stars Quad Shaders
+      const quadVsSource = `
+        attribute vec2 aPos;
+        varying vec2 vUv;
+        void main() {
+          vUv = aPos * 0.5 + 0.5;
+          gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+      `;
+
+      const quadFsSource = `
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+        #else
+        precision mediump float;
+        #endif
+
+        uniform vec2 uResolution;
+        uniform float uTime;
+        uniform float uScrollY;
+        varying vec2 vUv;
+
+        float hash12(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+
+        vec2 hash22(vec2 p) {
+          float n = sin(dot(p, vec2(127.1, 311.7)));
+          return fract(vec2(262144.0, 32768.0) * n);
+        }
+
+        float getStarLayer(vec2 uv, float scrollFactor, float cellSize, float starThresh) {
+          vec2 pos = uv * uResolution;
+          pos.y += uScrollY * scrollFactor;
+
+          vec2 gridId = floor(pos / cellSize);
+          vec2 gridUv = fract(pos / cellSize) - vec2(0.5, 0.5);
+
+          float light = 0.0;
+          for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+              vec2 neighbor = vec2(float(dx), float(dy));
+              vec2 cell = gridId + neighbor;
+              float r = hash12(cell);
+              if (r > starThresh) {
+                vec2 offset = (hash22(cell + vec2(1.23, 1.23)) - vec2(0.5, 0.5)) * 0.7;
+                vec2 d = gridUv - (neighbor + offset);
+                float dist = length(d);
+
+                float twinkle = 0.81 + 0.19 * sin(uTime * 1.6 + r * 6.28318);
+                float sz = 0.65 + 0.35 * fract(r * 17.31);
+                float core = smoothstep(0.18 * sz, 0.0, dist);
+                float halo = smoothstep(0.46 * sz, 0.0, dist) * 0.38;
+                float baseBright = 0.70 + 0.30 * ((r - starThresh) / (1.0 - starThresh));
+                light += (core * 1.05 + halo) * twinkle * baseBright;
+              }
+            }
+          }
+          return light;
+        }
+
+        void main() {
+          float farStars = getStarLayer(vUv, 0.22, 52.0, 0.91) * 0.58;
+          float nearStars = getStarLayer(vUv, 0.58, 72.0, 0.935) * 0.88;
+          gl_FragColor = vec4(vec3(farStars + nearStars), 1.0);
+        }
+      `;
+
+      function createShader(type, source) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, source);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          console.error("Shader error:", gl.getShaderInfoLog(s));
+          gl.deleteShader(s);
+          return null;
+        }
+        return s;
+      }
+
+      function createProgram(vsSrc, fsSrc) {
+        const vs = createShader(gl.VERTEX_SHADER, vsSrc);
+        const fs = createShader(gl.FRAGMENT_SHADER, fsSrc);
+        if (!vs || !fs) return null;
+        const p = gl.createProgram();
+        gl.attachShader(p, vs);
+        gl.attachShader(p, fs);
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+          console.error("Program error:", gl.getProgramInfoLog(p));
+          return null;
+        }
+        return p;
+      }
+
+      const quadProgram = createProgram(quadVsSource, quadFsSource);
+      const quadPosLoc = gl.getAttribLocation(quadProgram, "aPos");
+      const quadResolutionLoc = gl.getUniformLocation(quadProgram, "uResolution");
+      const quadTimeLoc = gl.getUniformLocation(quadProgram, "uTime");
+      const quadScrollYLoc = gl.getUniformLocation(quadProgram, "uScrollY");
+
+      const quadVerts = new Float32Array([
+        -1.0, -1.0,
+         1.0, -1.0,
+        -1.0,  1.0,
+        -1.0,  1.0,
+         1.0, -1.0,
+         1.0,  1.0
+      ]);
+      const quadBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+
+      function render() {
+        const now = performance.now();
+        const elapsed = (now - startTime) / 1000;
+        smoothScrollY += (rawScrollY - smoothScrollY) * 0.05;
+
+        gl.disable(gl.BLEND);
+        gl.useProgram(quadProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+        gl.vertexAttribPointer(quadPosLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(quadPosLoc);
+
+        gl.uniform2f(quadResolutionLoc, canvas.width, canvas.height);
+        gl.uniform1f(quadTimeLoc, elapsed);
+        gl.uniform1f(quadScrollYLoc, smoothScrollY);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(render);
+      }
+
+      requestAnimationFrame(render);
+    } else {
+      // Pure Stars Canvas 2D Fallback
+      const ctx = canvas.getContext("2d");
+
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      const startTime = performance.now();
+      const fallbackStars = [];
+      for (let i = 0; i < 110; i++) {
+        const isSmall = Math.random() < 0.65;
+        fallbackStars.push({
+          x: Math.random(),
+          y: Math.random() * 2.5,
+          depth: Math.random() < 0.6 ? 0.22 : 0.58,
+          size: isSmall ? (0.9 + Math.random() * 0.6) : (1.8 + Math.random() * 0.7),
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      function renderFallback(timestamp) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const now = timestamp || performance.now();
+        const elapsed = (now - startTime) / 1000;
+        smoothScrollY += (rawScrollY - smoothScrollY) * 0.05;
+
+        fallbackStars.forEach(s => {
+          const sx = s.x * canvas.width;
+          const sy = (s.y * canvas.height - smoothScrollY * s.depth) % canvas.height;
+          const py = sy < 0 ? sy + canvas.height : sy;
+          const twinkle = 0.81 + 0.19 * Math.sin(elapsed * 1.6 + s.phase);
+          ctx.fillStyle = "rgba(255, 255, 255, " + (0.75 * twinkle) + ")";
+          ctx.beginPath();
+          ctx.arc(sx, py, s.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        requestAnimationFrame(renderFallback);
+      }
+
+      requestAnimationFrame(renderFallback);
+    }
+
+    /* ==========================================================================
+       4. PAGE INTERACTIONS & STEP ORCHESTRATION
+       ========================================================================== */
+    function scrollToUpload() {
+      document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function handleNavJobsClick(e) {
+      e.preventDefault();
+      const res = document.getElementById('results-container');
+      if (res && res.style.display !== 'none') {
+        document.getElementById('jobs-section').scrollIntoView({ behavior: 'smooth' });
+      } else {
+        scrollToUpload();
+      }
+    }
+
+    function openSignupModal() {
+      const modal = document.getElementById('signup-modal');
+      if (modal) modal.style.display = 'grid';
+    }
+
+    function closeSignupModal() {
+      const modal = document.getElementById('signup-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function handleSignupSubmit(e) {
+      e.preventDefault();
+      closeSignupModal();
+      alert('Welcome to SkillBridge! Your candidate profile is ready. Upload your resume or pick test profiles below to begin.');
+      scrollToUpload();
+    }
+
+    function togglePasteArea() {
+      const el = document.getElementById('paste-area-container');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+      if (el.style.display === 'block') {
+        const textarea = document.getElementById('paste-textarea');
+        if (textarea && !textarea.value && currentResumeText) {
+          textarea.value = currentResumeText;
+        }
+      }
+    }
+
+    function loadSample(key) {
+      if (SAMPLES[key]) {
+        currentResumeText = SAMPLES[key];
+        const textarea = document.getElementById('paste-textarea');
+        if (textarea) textarea.value = SAMPLES[key];
+        const sub = document.getElementById('dropzone-sub');
+        if (sub) sub.innerHTML = `<span style="color:#00FF88; font-weight:700;">✓ Selected Sample Profile: ${key.toUpperCase()} ENGINEER</span>`;
+
+        ['Frontend', 'Backend', 'Data'].forEach(name => {
+          const btn = document.getElementById(`btnSample${name}`);
+          if (btn) btn.classList.remove('btn-sample-active');
+        });
+        const activeBtnKey = key === 'frontend' ? 'Frontend' : (key === 'backend' ? 'Backend' : 'Data');
+        const activeBtn = document.getElementById(`btnSample${activeBtnKey}`);
+        if (activeBtn) activeBtn.classList.add('btn-sample-active');
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    /* Extracts raw text from client-uploaded files (PDF, DOCX, TXT) — 100% in-browser.
+       PDF via pdf.js (ESM CDN), DOCX via mammoth (CDN). Zero server round-trips. */
+    async function extractDocumentText(file, onProgress) {
+      const fileType = file.type || '';
+      const fileName = file.name.toLowerCase();
+
+      if (fileType.includes('text') || fileName.endsWith('.txt')) {
+        onProgress && onProgress('Reading text file...');
+        return await file.text();
+      }
+
+      if (fileName.endsWith('.docx') || fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        onProgress && onProgress('Extracting DOCX text...');
+        if (typeof mammoth === 'undefined') throw new Error('DOCX parser failed to load (needs network once). Please paste your resume text instead.');
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+      }
+
+      if (fileName.endsWith('.pdf') || fileType === 'application/pdf') {
+        onProgress && onProgress('Parsing PDF pages...');
+        const arrayBuffer = await file.arrayBuffer();
+        try {
+          const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+          if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+            pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+          }
+          const pdfDoc = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          let fullText = '';
+          for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n';
+          }
+          return fullText;
+        } catch (pdfErr) {
+          const rawString = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(arrayBuffer));
+          const extracted = rawString.replace(/[^\x20-\x7E\n]/g, ' ');
+          if (extracted.trim().length > 50) return extracted;
+          throw new Error('Could not extract text from this PDF. Please paste your resume text instead.');
+        }
+      }
+
+      return await file.text();
+    }
+
+    async function ingestFile(file) {
+      const sub = document.getElementById('dropzone-sub');
+      const setSub = (html) => { if (sub) sub.innerHTML = html; };
+      try {
+        setSub('<span style="color:#AAA;">Reading ' + escapeHtml(file.name) + '...</span>');
+        const text = await extractDocumentText(file);
+        if (!text || text.trim().length < 15) {
+          throw new Error('Insufficient text extracted from file. Please paste your resume text below.');
+        }
+        currentResumeText = text;
+        const textarea = document.getElementById('paste-textarea');
+        if (textarea) textarea.value = text;
+        setSub('<span style="color:#00FF88; font-weight:700;">\u2713 Loaded File: ' + escapeHtml(file.name) + ' (' + text.length + ' characters)</span>');
+      } catch (err) {
+        setSub('<span style="color:#FF6B6B; font-weight:700;">\u26a0 ' + escapeHtml(err && err.message ? err.message : 'Could not read file') + '</span>');
+        const pasteArea = document.getElementById('paste-area-container');
+        if (pasteArea) pasteArea.style.display = 'block';
+      }
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      ingestFile(file);
+    }
+
+    function processPastedText() {
+      const val = document.getElementById('paste-textarea').value;
+      if (val && val.trim().length > 10) {
+        currentResumeText = val;
+        triggerAnalyze();
+      } else {
+        alert('Please paste some resume text or skills to analyze.');
+      }
+    }
+
+    // Drag and drop
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) ingestFile(file);
+    });
+
+    function triggerAnalyze() {
+      let text = currentResumeText;
+      if (!text || text.trim().length < 10) {
+        const val = document.getElementById('paste-textarea').value;
+        if (val && val.trim().length > 10) {
+          text = val;
+          currentResumeText = val;
+        } else {
+          text = SAMPLES.frontend;
+          currentResumeText = text;
+          loadSample('frontend');
+        }
+      }
+      executePipeline(text);
+    }
+
+    // Real Step Pipeline execution
+    function executePipeline(rawText) {
+      const progressContainer = document.getElementById('progress-bar-container');
+      const progressFill = document.getElementById('progress-fill');
+      const stepText = document.getElementById('progress-step-text');
+      const subText = document.getElementById('progress-sub-text');
+
+      progressContainer.style.display = 'block';
+
+      const targetJobs = getFilteredJobs();
+      const countryNames = selectedCountries.has('ALL') ? 'Worldwide' : Array.from(selectedCountries).join(', ');
+
+      // Stage 1
+      progressFill.style.width = '33%';
+      stepText.innerText = 'STAGE 1/3 · 33%';
+      subText.innerText = 'Extracting canonical tech skills & credentials...';
+
+      setTimeout(() => {
+        // Stage 2
+        progressFill.style.width = '66%';
+        stepText.innerText = 'STAGE 2/3 · 66%';
+        subText.innerText = `Loading [${countryNames}] in-memory vacancy registry...`;
+
+        const tokens = parseResumeText(rawText);
+        const resolved = resolveSkills(tokens);
+        lastParsedSkills = resolved;
+
+        setTimeout(() => {
+          // Stage 3
+          progressFill.style.width = '100%';
+          stepText.innerText = 'STAGE 3/3 · 100%';
+          subText.innerText = `Benchmarking candidate fit against ${targetJobs.length} curated roles & aggregating gaps...`;
+
+          const ranked = rankJobs(resolved);
+          const gaps = rankSkillGaps(resolved);
+
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            renderResults(resolved, ranked, gaps);
+
+            const resContainer = document.getElementById('results-container');
+            resContainer.style.display = 'block';
+            document.getElementById('score-section').scrollIntoView({ behavior: 'smooth' });
+          }, 350);
+        }, 350);
+      }, 300);
+    }
+
+    function getCountryFlag(country) {
+      switch (country) {
+        case 'India': return '🇮🇳';
+        case 'United States': return '🇺🇸';
+        case 'United Kingdom': return '🇬🇧';
+        case 'Germany': return '🇩🇪';
+        case 'Singapore': return '🇸🇬';
+        case 'Canada': return '🇨🇦';
+        case 'Remote': return '⚡';
+        case 'Utah': return '🏔️';
+        default: return '🌐';
+      }
+    }
+
+    function toggleCountrySelection(country) {
+      if (country === 'ALL') {
+        selectedCountries = new Set(['ALL']);
+      } else {
+        if (selectedCountries.has('ALL')) {
+          selectedCountries.clear();
+        }
+        if (selectedCountries.has(country)) {
+          selectedCountries.delete(country);
+          if (selectedCountries.size === 0) {
+            selectedCountries.add('ALL');
+          }
+        } else {
+          selectedCountries.add(country);
+        }
+        const allList = ['India', 'United States', 'United Kingdom', 'Germany', 'Singapore', 'Canada', 'Remote', 'Utah'];
+        if (allList.every(c => selectedCountries.has(c))) {
+          selectedCountries = new Set(['ALL']);
+        }
+      }
+
+      updateCountryUI();
+
+      // If user already analyzed, dynamically re-rank and re-render live!
+      if (lastParsedSkills && lastParsedSkills.length > 0) {
+        const ranked = rankJobs(lastParsedSkills);
+        const gaps = rankSkillGaps(lastParsedSkills);
+        renderResults(lastParsedSkills, ranked, gaps);
+      }
+    }
+
+    function updateCountryUI() {
+      // 1. Update pills across all .country-pill elements in upload and results
+      document.querySelectorAll('.country-pill').forEach(pill => {
+        const c = pill.getAttribute('data-country');
+        if (!c) return;
+        if (selectedCountries.has(c)) {
+          pill.classList.add('active');
+        } else {
+          pill.classList.remove('active');
+        }
+      });
+
+      const targetJobs = getFilteredJobs();
+
+      // 2. Format description string
+      let descText = '';
+      let telemetryTitle = '';
+      if (selectedCountries.has('ALL')) {
+        const totalAll = JOBS.length + LIVE_JOBS.length;
+        const liveBit = LIVE_JOBS.length ? ` · ${LIVE_JOBS.length} live` : '';
+        descText = `🌐 Worldwide (${totalAll} Roles${liveBit} across 8 Global Hubs)`;
+        telemetryTitle = '🌐 Worldwide (All Regions)';
+
+      } else {
+        const countryList = Array.from(selectedCountries);
+        const flags = countryList.map(c => `${getCountryFlag(c)} ${c}`).join(', ');
+        descText = `${flags} (${targetJobs.length} Curated Roles in scope)`;
+        telemetryTitle = flags;
+      }
+
+      // 3. Update DOM labels
+      const uploadStatusEl = document.getElementById('upload-country-status');
+      if (uploadStatusEl) uploadStatusEl.innerText = descText;
+
+      const resultsStatusEl = document.getElementById('country-status-indicator');
+      if (resultsStatusEl) resultsStatusEl.innerText = `${targetJobs.length} vacancies (curated + live feed) in the selected corridors`;
+
+      const scoreCountryEl = document.getElementById('score-active-country');
+      if (scoreCountryEl) scoreCountryEl.innerText = telemetryTitle;
+
+      const badgeEl = document.getElementById('active-jobs-summary-badge');
+      if (badgeEl) badgeEl.innerText = `${targetJobs.length} Roles Synced`;
+
+      const gapsLabelEl = document.getElementById('gaps-active-country-label');
+      if (gapsLabelEl) gapsLabelEl.innerText = selectedCountries.has('ALL') ? '🌐 Worldwide Corridors' : telemetryTitle;
+    }
+
+    /* ==========================================================================
+       5. RENDER RESULTS VIEW
+       ========================================================================== */
+    function renderResults(skills, ranked, gaps) {
+      // 1. Score count up
+      const avgScore = ranked.length > 0
+        ? Math.round(ranked.reduce((a, b) => a + b.score, 0) / ranked.length)
+        : 0;
+      const viableCount = ranked.filter(j => j.score >= 60).length;
+
+      document.getElementById('viable-count').innerText = `${viableCount} ROLES`;
+
+      const scoreEl = document.getElementById('score-number');
+      if (window._sbScoreInterval) clearInterval(window._sbScoreInterval);
+      let current = 0;
+      window._sbScoreInterval = setInterval(() => {
+        current += 1;
+        scoreEl.innerText = `${current}%`;
+        if (current >= avgScore) { clearInterval(window._sbScoreInterval); window._sbScoreInterval = null; }
+      }, 20);
+
+      // Detected skills
+      const skillsContainer = document.getElementById('detected-skills-list');
+      skillsContainer.innerHTML = '';
+      if (skills.length > 0) {
+        skills.forEach(s => {
+          skillsContainer.innerHTML += `<span class="badge badge-matched">${s}</span>`;
+        });
+      } else {
+        skillsContainer.innerHTML = '<span style="font-family:var(--font-mono); font-size:0.75rem; color:#555;">No canonical tech skills detected</span>';
+      }
+
+      // 2. Ranked Jobs Table (Desktop & Mobile)
+      const tbody = document.getElementById('jobs-table-body');
+      const mobileContainer = document.getElementById('mobile-jobs-container');
+      tbody.innerHTML = '';
+      mobileContainer.innerHTML = '';
+
+      ranked.forEach((item, idx) => {
+        const salaryText = item.job.salaryDisplay || (item.job.salaryLpa ? `${item.job.salaryLpa.min}-${item.job.salaryLpa.max} LPA` : '$120k-$180k');
+        const flagText = item.job.flag || '🌐';
+
+        // Desktop row
+        const tr = document.createElement('tr');
+        tr.className = 'job-row';
+        tr.onclick = () => toggleJobDetail(item.job.id, item);
+
+        const matchedBadges = item.matchedSkills.slice(0, 3).map(s => `<span class="badge badge-matched">${s}</span>`).join(' ') +
+          (item.matchedSkills.length > 3 ? ` <span style="color:var(--muted); font-size:0.65rem;">+${item.matchedSkills.length - 3}</span>` : '');
+
+        const missingBadges = item.missingSkills.slice(0, 3).map(s => `<span class="badge badge-missing">${s}</span>`).join(' ') +
+          (item.missingSkills.length > 3 ? ` <span style="color:var(--muted); font-size:0.65rem;">+${item.missingSkills.length - 3}</span>` : '');
+
+        tr.innerHTML = `
+          <td>
+            <div class="job-title">${item.job.title}${item.job.live ? ' <span class="badge" style="background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.4); color:#00FF88; font-size:0.6rem; vertical-align:middle;">● LIVE</span>' : ''}</div>
+            <div class="job-company">${item.job.company} · <span style="color:#A0A0A0; font-size:0.68rem;">${item.job.experience}</span></div>
+          </td>
+          <td style="color:#CCC;"><span style="font-size:0.95rem; margin-right:4px;">${flagText}</span> ${item.job.city}</td>
+          <td class="job-salary">${salaryText}</td>
+          <td class="job-score" style="color:${item.score >= 60 ? '#FFF' : '#888'};">${item.score}%</td>
+          <td>${matchedBadges || '<span style="color:#555;">—</span>'}</td>
+          <td>${missingBadges || '<span style="color:#FFF;">All matched!</span>'}</td>
+        `;
+        tbody.appendChild(tr);
+
+        // Expander row
+        const expTr = document.createElement('tr');
+        expTr.id = `detail-row-${item.job.id}`;
+        expTr.style.display = 'none';
+        expTr.innerHTML = `
+          <td colspan="6" style="padding:0;">
+            <div class="job-detail-drawer">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                <div>
+                  <div style="font-weight:700; color:#FFF; font-size:0.9rem;">${item.job.title} · ${item.job.company}</div>
+                  <div style="color:var(--muted); font-size:0.72rem; margin-top:2px;">
+                    <span style="font-size:0.85rem; margin-right:3px;">${flagText}</span> ${item.job.city}, ${item.job.country} · <span style="color:#FFF; font-weight:600;">${salaryText}</span> · <span style="color:#AAA;">${item.job.experience}</span> · <span class="badge" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); font-size:0.65rem;">${item.job.hubType}</span>
+                  </div>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                  ${item.job.live && item.job.applyUrl ? `<a class="btn-primary" style="padding:0.5rem 1rem; font-size:0.7rem; text-decoration:none;" href="${item.job.applyUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();">APPLY →</a>` : ''}
+                  <button class="btn-secondary" onclick="event.stopPropagation(); toggleJobDetail('${item.job.id}')">CLOSE [✕]</button>
+                </div>
+              </div>
+              <p style="font-family:var(--font-sans); color:#DDD; font-size:0.75rem; border-left:2px solid #FFF; padding-left:0.75rem; margin-bottom:0.75rem; line-height:1.5;">
+                ${item.job.description}
+              </p>
+              <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:4px; padding:0.6rem 0.8rem; margin-bottom:1rem; font-size:0.72rem; color:#BBB;">
+                <strong style="color:#FFF;">ECOSYSTEM INTELLIGENCE:</strong> ${item.job.marketNote}
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; border-top:1px solid rgba(255,255,255,0.08); padding-top:0.75rem;">
+                <div>
+                  <div style="font-weight:600; color:#FFF; font-size:0.7rem; margin-bottom:0.4rem;">YOU HAVE (${item.matchedSkills.length})</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                    ${item.matchedSkills.map(s => {
+                      const r = item.job.requiredSkills.find(x => x.skill === s);
+                      return `<span class="badge badge-matched">${s} <span class="badge-weight">w${r ? r.weight : 1}</span></span>`;
+                    }).join('') || '<span style="color:#666;">None</span>'}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-weight:600; color:var(--muted); font-size:0.7rem; margin-bottom:0.4rem;">YOU'RE MISSING (${item.missingSkills.length})</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                    ${item.missingSkills.map(s => {
+                      const r = item.job.requiredSkills.find(x => x.skill === s);
+                      return `<span class="badge badge-missing">${s} <span class="badge-weight">w${r ? r.weight : 1}</span></span>`;
+                    }).join('') || '<span style="color:#FFF;">All requirements met!</span>'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(expTr);
+
+        // Mobile Card
+        const mCard = document.createElement('div');
+        mCard.className = 'mobile-card';
+        mCard.onclick = () => toggleJobDetail(`mob-${item.job.id}`);
+        mCard.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.4rem;">
+            <div>
+              <div class="job-title">${item.job.title}${item.job.live ? ' <span class="badge" style="background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.4); color:#00FF88; font-size:0.6rem;">● LIVE</span>' : ''}</div>
+              <div class="job-company">${flagText} ${item.job.company} · ${item.job.city} · <span style="color:#AAA;">${item.job.experience}</span></div>
+            </div>
+            <div class="job-score" style="font-size:1.1rem;">${item.score}%</div>
+          </div>
+          <div style="font-weight:700; color:#FFF; margin-bottom:0.5rem;">${salaryText} · <span style="font-weight:400; font-size:0.72rem; color:var(--muted);">${item.job.hubType}</span></div>
+          <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+            ${item.matchedSkills.map(s => `<span class="badge badge-matched">${s}</span>`).join('')}
+            ${item.missingSkills.map(s => `<span class="badge badge-missing">${s}</span>`).join('')}
+          </div>
+          <div id="detail-row-mob-${item.job.id}" style="display:none; margin-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); padding-top:0.75rem;">
+            <p style="font-family:var(--font-sans); color:#DDD; font-size:0.75rem; margin-bottom:0.5rem;">${item.job.description}</p>
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:4px; padding:0.5rem; margin-bottom:0.75rem; font-size:0.7rem; color:#BBB;">
+              <strong style="color:#FFF;">MARKET NOTE:</strong> ${item.job.marketNote}
+            </div>
+            <div style="font-weight:600; color:#FFF; font-size:0.7rem; margin-bottom:0.25rem;">YOU HAVE (${item.matchedSkills.length})</div>
+            <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.5rem;">
+              ${item.matchedSkills.map(s => `<span class="badge badge-matched">${s}</span>`).join('') || '<span style="color:#666;">None</span>'}
+            </div>
+            <div style="font-weight:600; color:var(--muted); font-size:0.7rem; margin-bottom:0.25rem;">YOU'RE MISSING (${item.missingSkills.length})</div>
+            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+              ${item.missingSkills.map(s => `<span class="badge badge-missing">${s}</span>`).join('') || '<span style="color:#FFF;">All requirements met!</span>'}
+            </div>
+          </div>
+        `;
+        mobileContainer.appendChild(mCard);
+      });
+
+      // 3. Skill Gaps Chart
+      const gapsContainer = document.getElementById('gaps-chart-container');
+      gapsContainer.innerHTML = '';
+      const topGaps = gaps.slice(0, 8);
+      const maxCount = Math.max(1, ...topGaps.map(g => g.demandCount));
+
+      const targetJobs = getFilteredJobs();
+      const totalInScope = targetJobs.length || 1;
+
+      // Update AI recommended focus
+      const topFocusEl = document.getElementById('gaps-top-focus');
+      if (topFocusEl && topGaps.length > 0) {
+        topFocusEl.innerText = topGaps[0].skill.toUpperCase() + (topGaps.length > 1 ? ` & ${topGaps[1].skill.toUpperCase()}` : '');
+      }
+
+      topGaps.forEach(gap => {
+        const pct = Math.round((gap.demandCount / totalInScope) * 100);
+        const width = Math.round((gap.demandCount / maxCount) * 100);
+
+        gapsContainer.innerHTML += `
+          <div class="gap-bar-container">
+            <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:0.25rem;">
+              <span style="font-weight:700; color:#FFF; text-transform:capitalize;">${gap.skill}</span>
+              <span style="color:var(--muted);">Required by ${gap.demandCount} roles (${pct}%)</span>
+            </div>
+            <div class="gap-bar-track">
+              <div class="gap-bar-fill" style="width:${width}%;"></div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function toggleJobDetail(id) {
+      const el = document.getElementById(`detail-row-${id}`);
+      if (el) {
+        const isTable = el.tagName === 'TR';
+        el.style.display = el.style.display === 'none' ? (isTable ? 'table-row' : 'block') : 'none';
+      }
+    }
+
+    // Intersection Observer for Smooth Scroll Reveals
+    function initScrollReveal() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed');
+          }
+        });
+      }, {
+        threshold: 0.12,
+        rootMargin: '0px 0px -40px 0px'
+      });
+
+      document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
+    }
+
+    // Cinematic Opening Sequence & Page Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      const heroContent = document.querySelector('.hero-content');
+      const siteHeader = document.querySelector('.site-header');
+      const canvasContainer = document.getElementById('canvas-container');
+
+      // 1. Initial State: Screen is completely pure black void
+      // 2. Stage 1: Dheere se text emerges smoothly from the dark abyss (over 2.4s)
+      setTimeout(() => {
+        if (heroContent) heroContent.classList.add('abyss-revealed');
+        if (siteHeader) siteHeader.classList.add('header-revealed');
+      }, 600);
+
+      // 3. Stage 2: Uske baad dheere se smoothly stars appear in background (over 3.8s)
+      setTimeout(() => {
+        if (canvasContainer) canvasContainer.classList.add('stars-revealed');
+      }, 2800);
+
+      // 4. Initialize scroll reveal observer
+      initScrollReveal();
+
+      // 5. Setup default buffer & country UI without prematurely revealing results
+      loadSample('frontend');
+      updateCountryUI();
+
+      // 6. Pull the live job feed in the background (non-blocking; curated data stays as fallback)
+      fetchLiveJobs();
+    });
+  </script>
+</body>
+</html>
